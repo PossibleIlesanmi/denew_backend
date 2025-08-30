@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+  {% block content %}
+    <div class="app-admin-index">
+      <h1>{{ title }}</h1>
+      {% if app_list %}
+        {% for app in app_list %}
+          <div class="app-{{ app.app_label }} module">
+            <table>
+              <caption>
+                <a href="{{ app.app_url }}" class="section" title="{{ app.name }}">{{ app.name }}</a>
+              </caption>
+              {% for model in app.models %}
+                <tr class="model-{{ model.object_name|lower }}">
+                  <th scope="row"><a href="{{ model.admin_url }}" class="model-link">{{ model.name }}</a></th>
+                </tr>
+              {% endfor %}
+            </table>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p>You don't have permission to view or edit anything.</p>
+      {% endif %}
+
+      <!-- Custom Dashboard Analytics -->
+      <div class="dashboard-stats">
+        <h2>Platform Statistics</h2>
+        <ul>
+          <li>Total Users: {{ total_users }}</li>
+          <li>Verified Users: {{ verified_users }} ({{ verification_rate|floatformat:2 }}%)</li>
+          <li>Staff Users: {{ staff_users }}</li>
+          <li>Recent Users (Last 7 Days): {{ recent_users }}</li>
+          <li>Users with Referrals: {{ users_with_referrals }}</li>
+        </ul>
+      </div>
+    </div>
+  {% endblock %}
