@@ -3,8 +3,8 @@ djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.0
 django-cors-headers==4.3.1
 python-decouple==3.8
-psycopg2-binary==2.9.7  # For PostgreSQL
-Pillow==9.5.0  # Downgraded to avoid build issues with Python 3.13
-dj-database-url==2.2.0  # For Render's PostgreSQL
-whitenoise==6.7.0  # For serving static files
-gunicorn==22.0.0  # For Render's WSGI server
+psycopg2-binary==2.9.7
+Pillow==10.4.0
+dj-database-url==2.2.0
+whitenoise==6.7.0
+gunicorn==22.0.0
