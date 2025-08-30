@@ -12,8 +12,7 @@ SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')  #
 DEBUG = config('DEBUG', default=False, cast=bool)  # Set to False for production on Render
 
 # ALLOWED_HOSTS must include Render's domain and frontend domain
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*.onrender.com,denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
-
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='denew-backend.onrender.com,*.onrender.com,denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
