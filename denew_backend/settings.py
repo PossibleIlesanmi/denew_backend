@@ -7,7 +7,7 @@ from decouple import config  # For environment variables
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Use environment variable for SECRET_KEY
-SECRET_KEY = config('SECRET_KEY', default='your-secure-secret-key-here')  # Set in .env file
+SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')  # Updated to your provided key
 DEBUG = config('DEBUG', default=False, cast=bool)  # Set to False for production on Render
 
 # ALLOWED_HOSTS must include Render's domain and frontend domain
@@ -63,7 +63,7 @@ WSGI_APPLICATION = 'denew_backend.wsgi.application'
 import dj_database_url
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL'),
+        default=config('DATABASE_URL', default='postgres://denew_user:denewsystem1@localhost:5432/denew_db'),  # Fallback for local testing
         conn_max_age=600,
         conn_health_checks=True,
     )
