@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Sum
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404  # If you need this elsewhere
 from django.core.mail import send_mail
 from .serializers import (
     WithdrawalCompletionSerializer, WithdrawalListSerializer, AdminWithdrawalActionSerializer,
@@ -34,37 +34,37 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
-def index_view(request):
-    """Render the index.html (login page)"""
-    return render(request, 'index.html')
+# def index_view(request):
+#     """Render the index.html (login page)"""
+#     return render(request, 'index.html')
 
-def dashboard_view(request):
-    if not request.user.is_authenticated:
-        return redirect('index')
-    return render(request, 'dashboard.html', {
-        'user': request.user,
-        'total_earnings': 0,
-        'total_tasks': 0,
-        'team_members': 0
-    })
+# def dashboard_view(request):
+#     if not request.user.is_authenticated:
+#         return redirect('index')
+#     return render(request, 'dashboard.html', {
+#         'user': request.user,
+#         'total_earnings': 0,
+#         'total_tasks': 0,
+#         'team_members': 0
+#     })
 
-def tasks_view(request):
-    if not request.user.is_authenticated:
-        return redirect('index')
-    return render(request, 'tasks.html')
+# def tasks_view(request):
+#     if not request.user.is_authenticated:
+#         return redirect('index')
+#     return render(request, 'tasks.html')
 
-def lost_pin_view(request):
-    return render(request, 'lost_pin.html')  # Updated to match intended naming
+# def lost_pin_view(request):
+#     return render(request, 'lost_pin.html')  # Updated to match intended naming
 
-def my_team_view(request):
-    if not request.user.is_authenticated:
-        return redirect('index')
-    return render(request, 'my_team.html')  # Updated to match intended naming
+# def my_team_view(request):
+#     if not request.user.is_authenticated:
+#         return redirect('index')
+#     return render(request, 'my_team.html')  # Updated to match intended naming
 
-def profile_settings_view(request):
-    if not request.user.is_authenticated:
-        return redirect('index')
-    return render(request, 'profile_settings.html')
+# def profile_settings_view(request):
+#     if not request.user.is_authenticated:
+#         return redirect('index')
+#     return render(request, 'profile_settings.html')
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
