@@ -1,12 +1,23 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+import random
 
 class User(AbstractUser):
     full_name = models.CharField(max_length=255, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    vip_level = models.CharField(max_length=50, default='VIP 1')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=50.00)  # $50 registration bonus
+    vip_level = models.CharField(
+        max_length=50,
+        choices=[
+            ('VIP 0', 'VIP 0'),  # Added VIP 0 for consistency with 0.5% rate
+            ('VIP 1', 'VIP 1'),
+            ('VIP 2', 'VIP 2'),
+            ('VIP 3', 'VIP 3'),
+            ('VIP 4', 'VIP 4'),
+        ],
+        default='VIP 0'
+    )
     referral_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
     withdrawal_password = models.CharField(max_length=4, blank=True)
     wallet_address = models.CharField(max_length=100, blank=True, null=True)
@@ -15,11 +26,18 @@ class User(AbstractUser):
     twofa_enabled = models.BooleanField(default=False)
     profile_picture = models.CharField(max_length=255, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
+    tasks_completed = models.IntegerField(default=0)  # Tracks total completed tasks
+    current_set = models.IntegerField(default=0)  # Tracks current task set
+    can_invite = models.BooleanField(default=False)
+    tasks_reset_required = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if not self.referral_code:
             self.referral_code = self.username.upper() + str(timezone.now().timestamp())[-4:]
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.username
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -33,23 +51,55 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"Profile for {self.user.username}"
 
-class Task(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tasks')
-    task_type = models.CharField(max_length=50, choices=[('normal', 'Normal'), ('combined', 'Combined')])
-    earnings = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('completed', 'Completed')])
-    created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
+class Product(models.Model):
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=100, blank=True)  # Emoji or image URL
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    is_combined = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Task {self.id} by {self.user.username}"
+        return self.name
+
+class Task(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tasks')
+    products = models.ManyToManyField(Product, related_name='tasks')  # Multiple products
+    task_type = models.CharField(
+        max_length=50,
+        choices=[('normal', 'Normal'), ('combined', 'Combined')],
+        default='normal'
+    )
+    set_number = models.IntegerField(default=1)
+    task_number = models.IntegerField(default=1)  # 1 to 40
+    earnings = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('completed', 'Completed')],
+        default='pending'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    merchant_complaint = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Task {self.id} by {self.user.username} - Set {self.set_number}, Task {self.task_number}"
+
+    class Meta:
+        unique_together = ('user', 'set_number', 'task_number')
 
 class Deposit(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='deposits')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=50, choices=[('usdt', 'USDT')], default='usdt')
+    payment_method = models.CharField(
+        max_length=50,
+        choices=[('usdt', 'USDT')],
+        default='usdt'
+    )
     wallet_address = models.CharField(max_length=100, blank=True)
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('confirmed', 'Confirmed')], default='pending')
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('confirmed', 'Confirmed')],
+        default='pending'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -58,9 +108,13 @@ class Deposit(models.Model):
 class Withdrawal(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='withdrawals')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=50)
-    wallet_address = models.CharField(max_length=42)
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('completed', 'Completed'), ('rejected', 'Rejected')], default='pending')
+    payment_method = models.CharField(max_length=50, default='usdt')
+    wallet_address = models.CharField(max_length=100)
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('completed', 'Completed'), ('rejected', 'Rejected')],
+        default='pending'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
 
@@ -71,9 +125,20 @@ class Invitation(models.Model):
     referrer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referrals')
     referee_email = models.EmailField()
     referee_name = models.CharField(max_length=255)
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('accepted', 'Accepted')], default='pending')
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('accepted', 'Accepted')],
+        default='pending'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+    referee = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referred_by'
+    )
 
     def __str__(self):
         return f"Invitation from {self.referrer.username} to {self.referee_email}"
@@ -95,7 +160,7 @@ class TermsAndConditions(models.Model):
 
 class Portfolio(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='portfolio')
-    assets = models.TextField(blank=True)  # JSON or comma-separated list of assets
+    assets = models.TextField(blank=True)
     total_value = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -109,7 +174,6 @@ class SupportTicket(models.Model):
         ('high', 'High'),
         ('urgent', 'Urgent'),
     ]
-    
     STATUS_CHOICES = [
         ('open', 'Open'),
         ('in_progress', 'In Progress'),
@@ -127,6 +191,21 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"Ticket {self.id} by {self.user.username} - {self.subject}"
+
+    class Meta:
+        ordering = ['-created_at']
+
+class Campaign(models.Model):
+    title = models.CharField(max_length=255)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    details = models.TextField()
+    terms = models.JSONField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
 
     class Meta:
         ordering = ['-created_at']

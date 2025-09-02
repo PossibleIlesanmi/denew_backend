@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
-from .models import Task, Deposit, Withdrawal, Invitation, TermsAndConditions, UserProfile, Portfolio, SupportTicket
+from .models import Task, Deposit, Withdrawal, Invitation, TermsAndConditions, UserProfile, Portfolio, SupportTicket, Product, Campaign
 
 User = get_user_model()
 
@@ -55,7 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['username', 'email', 'full_name', 'phone_number', 'balance', 'vip_level',
                  'referral_code', 'date_joined', 'last_login', 'email_notifications',
                  'sms_notifications', 'twofa_enabled', 'profile_picture', 'is_verified',
-                 'profile', 'withdrawal_password']  # Added withdrawal_password
+                 'profile', 'withdrawal_password']
 
     def update(self, instance, validated_data):
         withdrawal_password = validated_data.pop('withdrawal_password', None)
@@ -64,8 +64,6 @@ class UserSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 class UserProfileUpdateSerializer(serializers.Serializer):
-    """Serializer for updating both User and UserProfile fields"""
-    # User fields
     email = serializers.EmailField(required=False)
     full_name = serializers.CharField(max_length=255, required=False)
     phone_number = serializers.CharField(max_length=20, required=False)
@@ -74,13 +72,7 @@ class UserProfileUpdateSerializer(serializers.Serializer):
     email_notifications = serializers.BooleanField(required=False)
     sms_notifications = serializers.BooleanField(required=False)
     twofa_enabled = serializers.BooleanField(required=False)
-    withdrawal_password = serializers.CharField(max_length=4, required=False)  # Added withdrawal_password
-
-    # UserProfile fields
-    bio = serializers.CharField(required=False, allow_blank=True)
-    location = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    website = serializers.URLField(required=False, allow_blank=True)
-    avatar = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    withdrawal_password = serializers.CharField(max_length=4, required=False)
 
     def validate_email(self, value):
         user = self.context['request'].user
@@ -89,19 +81,31 @@ class UserProfileUpdateSerializer(serializers.Serializer):
         return value
 
     def validate(self, data):
-        # If new password is provided, current password must also be provided
         if 'new_password' in data and 'current_password' not in data:
             raise serializers.ValidationError({'current_password': 'Current password is required when setting new password'})
-        # Validate withdrawal_password if provided
         withdrawal_password = data.get('withdrawal_password')
         if withdrawal_password and (not withdrawal_password.isdigit() or len(withdrawal_password) != 4):
             raise serializers.ValidationError({'withdrawal_password': 'Withdrawal PIN must be a 4-digit number'})
         return data
 
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'icon', 'price', 'is_combined']
+
 class TaskSerializer(serializers.ModelSerializer):
+    products = ProductSerializer(many=True)
+
     class Meta:
         model = Task
-        fields = ['id', 'task_type', 'earnings', 'status', 'created_at', 'completed_at']
+        fields = ['id', 'task_type', 'set_number', 'task_number', 'earnings', 'status', 'products']
+
+class CurrentTaskSerializer(serializers.ModelSerializer):
+    products = ProductSerializer(many=True)
+
+    class Meta:
+        model = Task
+        fields = ['id', 'task_type', 'set_number', 'task_number', 'earnings', 'status', 'products', 'created_at', 'completed_at']
 
 class DepositSerializer(serializers.ModelSerializer):
     status = serializers.CharField(read_only=True)
@@ -119,12 +123,6 @@ class DepositSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['status'] = 'pending'
         return super().create(validated_data)
-
-# ... (other imports and serializers remain unchanged)
-
-# ... (other imports and serializers remain unchanged)
-
-# ... (other imports and serializers remain unchanged)
 
 class WithdrawalSerializer(serializers.ModelSerializer):
     withdrawal_password = serializers.CharField(write_only=True)
@@ -148,12 +146,6 @@ class WithdrawalSerializer(serializers.ModelSerializer):
         validated_data.pop('withdrawal_password')
         return Withdrawal.objects.create(**validated_data)
 
-# ... (rest of the file remains unchanged)
-
-# ... (rest of the file remains unchanged)
-
-# ... (rest of the file remains unchanged)
-
 class InvitationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invitation
@@ -175,12 +167,7 @@ class TermsSerializer(serializers.ModelSerializer):
         model = TermsAndConditions
         fields = ['content', 'created_at']
 
-
-# Add these serializers to your serializers.py file
-
 class WithdrawalCompletionSerializer(serializers.ModelSerializer):
-    """Serializer for admin to complete/reject withdrawals"""
-    
     class Meta:
         model = Withdrawal
         fields = ['id', 'user', 'amount', 'payment_method', 'wallet_address', 'status', 'created_at', 'processed_at']
@@ -192,7 +179,6 @@ class WithdrawalCompletionSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 class WithdrawalListSerializer(serializers.ModelSerializer):
-    """Serializer for listing withdrawals with user info"""
     username = serializers.CharField(source='user.username', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     
@@ -202,7 +188,6 @@ class WithdrawalListSerializer(serializers.ModelSerializer):
                  'wallet_address', 'status', 'created_at', 'processed_at']
 
 class AdminWithdrawalActionSerializer(serializers.Serializer):
-    """Serializer for admin withdrawal actions"""
     action = serializers.ChoiceField(choices=['approve', 'reject'])
     admin_notes = serializers.CharField(required=False, allow_blank=True)
     
@@ -211,7 +196,6 @@ class AdminWithdrawalActionSerializer(serializers.Serializer):
             raise serializers.ValidationError('Action must be approve or reject')
         return value
 
-# Enhanced TransactionHistorySerializer to include more details
 class EnhancedTransactionHistorySerializer(serializers.Serializer):
     deposits = DepositSerializer(many=True, read_only=True)
     withdrawals = WithdrawalListSerializer(many=True, read_only=True)
@@ -225,8 +209,15 @@ class EnhancedTransactionHistorySerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         raise NotImplementedError("TransactionHistorySerializer is read-only")
 
+class TransactionHistorySerializer(serializers.Serializer):
+    deposits = DepositSerializer(many=True)
+    withdrawals = WithdrawalSerializer(many=True)
 
+    def create(self, validated_data):
+        raise NotImplementedError("TransactionHistorySerializer is read-only")
 
+    def update(self, instance, validated_data):
+        raise NotImplementedError("TransactionHistorySerializer is read-only")
 
 class PortfolioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -238,12 +229,7 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         model = SupportTicket
         fields = ['subject', 'message', 'status', 'created_at']
 
-class TransactionHistorySerializer(serializers.Serializer):
-    deposits = DepositSerializer(many=True)
-    withdrawals = WithdrawalSerializer(many=True)
-
-    def create(self, validated_data):
-        raise NotImplementedError("TransactionHistorySerializer is read-only")
-
-    def update(self, instance, validated_data):
-        raise NotImplementedError("TransactionHistorySerializer is read-only")
+class CampaignSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Campaign
+        fields = ['title', 'start_date', 'end_date', 'details', 'terms', 'created_at']

@@ -5,18 +5,15 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Sum
-from django.shortcuts import get_object_or_404  # If you need this elsewhere
 from django.core.mail import send_mail
 from .serializers import (
     WithdrawalCompletionSerializer, WithdrawalListSerializer, AdminWithdrawalActionSerializer,
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer, TaskSerializer,
-    DepositSerializer, WithdrawalSerializer, InvitationSerializer, TermsSerializer,
-    PortfolioSerializer, SupportTicketSerializer, TransactionHistorySerializer,
-    UserProfileUpdateSerializer
+    CurrentTaskSerializer, ProductSerializer, DepositSerializer, WithdrawalSerializer,
+    InvitationSerializer, TermsSerializer, PortfolioSerializer, SupportTicketSerializer,
+    TransactionHistorySerializer, EnhancedTransactionHistorySerializer, CampaignSerializer
 )
-from .models import (
-    User, Task, Deposit, Withdrawal, Invitation, TermsAndConditions, UserProfile, Portfolio, SupportTicket
-)
+from .models import User, Task, Product, Deposit, Withdrawal, Invitation, TermsAndConditions, UserProfile, Portfolio, SupportTicket, Campaign
 from django.utils import timezone
 from datetime import timedelta
 import random
@@ -34,38 +31,6 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
-# def index_view(request):
-#     """Render the index.html (login page)"""
-#     return render(request, 'index.html')
-
-# def dashboard_view(request):
-#     if not request.user.is_authenticated:
-#         return redirect('index')
-#     return render(request, 'dashboard.html', {
-#         'user': request.user,
-#         'total_earnings': 0,
-#         'total_tasks': 0,
-#         'team_members': 0
-#     })
-
-# def tasks_view(request):
-#     if not request.user.is_authenticated:
-#         return redirect('index')
-#     return render(request, 'tasks.html')
-
-# def lost_pin_view(request):
-#     return render(request, 'lost_pin.html')  # Updated to match intended naming
-
-# def my_team_view(request):
-#     if not request.user.is_authenticated:
-#         return redirect('index')
-#     return render(request, 'my_team.html')  # Updated to match intended naming
-
-# def profile_settings_view(request):
-#     if not request.user.is_authenticated:
-#         return redirect('index')
-#     return render(request, 'profile_settings.html')
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -76,7 +41,7 @@ def register_user(request):
         tokens = get_tokens_for_user(user)
         user_data = UserSerializer(user).data
         return Response({
-            'message': 'User registered successfully',
+            'message': 'Registration successful! You have received a $50 bonus.',
             'user': user_data,
             'tokens': tokens
         }, status=status.HTTP_201_CREATED)
@@ -216,64 +181,155 @@ def dashboard_data(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_tasks(request):
-    print(f"Request user: {request.user}, Auth header: {request.headers.get('Authorization')}, Meta: {request.META}")
-    if not request.user.is_authenticated:
-        print("User not authenticated")
     tasks = Task.objects.filter(user=request.user).order_by('-created_at')
     serializer = TaskSerializer(tasks, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_current_task(request):
+    user = request.user
+    current_set = user.current_set
+    if not current_set:
+        return Response({'task': None}, status=status.HTTP_200_OK)
+    task = Task.objects.filter(user=user, set_number=current_set, status='pending').order_by('task_number').first()
+    if not task:
+        task = Task.objects.filter(user=user, set_number=current_set, status='in-progress').order_by('task_number').first()
+    if not task:
+        return Response({'task': None}, status=status.HTTP_200_OK)
+    serializer = CurrentTaskSerializer(task)
+    return Response({'task': serializer.data}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_products(request):
+    products = list(Product.objects.all())
+    if len(products) < 4:
+        return Response({'error': 'Not enough products available'}, status=status.HTTP_400_BAD_REQUEST)
+    selected_products = random.sample(products, 4)
+    serializer = ProductSerializer(selected_products, many=True)
+    return Response({'products': serializer.data}, status=status.HTTP_200_OK)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def invite_friend(request):
-    print(f"Request user: {request.user}, Auth header: {request.headers.get('Authorization')}, Meta: {request.META}")
-    if not request.user.is_authenticated:
-        print("User not authenticated")
-    
-    serializer = InvitationSerializer(data=request.data, context={'request': request})
-    if serializer.is_valid():
-        if Task.objects.filter(user=request.user, status='pending').exists():
-            return Response({'error': 'Complete all tasks before inviting'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        invitation = serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_REQUEST)
+def start_task_set(request):
+    user = request.user
+    if user.balance < 100:
+        return Response({'error': 'Minimum balance of 100 USDT required'}, status=status.HTTP_400_BAD_REQUEST)
+    if Task.objects.filter(user=user, status='pending').exists():
+        return Response({'error': 'Complete existing tasks before starting a new set'}, status=status.HTTP_400_BAD_REQUEST)
+    user.current_set += 1
+    user.tasks_completed = 0
+    user.tasks_reset_required = False
+    user.save()
+    task_type = 'combined' if user.balance > 500 else 'normal'
+    earnings_rate = {'VIP 0': 0.005, 'VIP 1': 0.005, 'VIP 2': 0.01, 'VIP 3': 0.015, 'VIP 4': 0.02}
+    earnings = user.balance * earnings_rate.get(user.vip_level, 0.005) * (5 if task_type == 'combined' else 1)
+    products = random.sample(list(Product.objects.all()), min(4 if task_type == 'combined' else 1, Product.objects.count()))
+    task = Task.objects.create(
+        user=user,
+        task_type=task_type,
+        set_number=user.current_set,
+        task_number=1,
+        earnings=earnings,
+        status='pending'
+    )
+    task.products.set(products)
+    return Response({
+        'message': 'Task set started',
+        'task_type': task_type
+    }, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_task(request):
     user = request.user
-    if user.balance < 100:
-        return Response({'error': 'Minimum balance of 100 USDT required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    task_type = 'combined' if user.balance > 500 else 'normal'
-    earnings_rate = {'VIP 1': 0.005, 'VIP 2': 0.01, 'VIP 3': 0.015, 'VIP 4': 0.02}
-    earnings = user.balance * earnings_rate.get(user.vip_level, 0.005) * (5 if task_type == 'combined' else 1)
-    
-    task = Task.objects.create(user=user, task_type=task_type, earnings=earnings, status='pending')
-    return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+    task_id = request.data.get('task_id')
+    try:
+        task = Task.objects.get(id=task_id, user=user, status='pending')
+        if (timezone.now() - task.created_at).total_seconds() > 2 * 3600:
+            task.merchant_complaint = True
+            task.save()
+            return Response({'error': 'Task expired (2-hour limit)'}, status=status.HTTP_400_BAD_REQUEST)
+        task.status = 'in-progress'
+        task.save()
+        return Response({
+            'message': 'Task started',
+            'task_type': task.task_type
+        }, status=status.HTTP_200_OK)
+    except Task.DoesNotExist:
+        return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_task(request):
+    user = request.user
     task_id = request.data.get('task_id')
     try:
-        task = Task.objects.get(id=task_id, user=request.user)
-        if task.status != 'pending':
-            return Response({'error': 'Task is not in pending status'}, status=status.HTTP_400_BAD_REQUEST)
+        task = Task.objects.get(id=task_id, user=user, status='in-progress')
+        if (timezone.now() - task.created_at).total_seconds() > 2 * 3600:
+            task.merchant_complaint = True
+            task.save()
+            return Response({'error': 'Task expired (2-hour limit)'}, status=status.HTTP_400_BAD_REQUEST)
         task.status = 'completed'
         task.completed_at = timezone.now()
         task.save()
-        request.user.balance += task.earnings
-        request.user.save()
+        user.balance += task.earnings
+        user.tasks_completed += 1
+        user.can_invite = user.tasks_completed >= 40
+        user.tasks_reset_required = user.tasks_completed >= 40
+        user.save()
+        if user.tasks_completed < 40:
+            task_type = 'combined' if user.balance > 500 else 'normal'
+            earnings_rate = {'VIP 0': 0.005, 'VIP 1': 0.005, 'VIP 2': 0.01, 'VIP 3': 0.015, 'VIP 4': 0.02}
+            earnings = user.balance * earnings_rate.get(user.vip_level, 0.005) * (5 if task_type == 'combined' else 1)
+            products = random.sample(list(Product.objects.all()), min(4 if task_type == 'combined' else 1, Product.objects.count()))
+            new_task = Task.objects.create(
+                user=user,
+                task_type=task_type,
+                set_number=user.current_set,
+                task_number=task.task_number + 1,
+                earnings=earnings,
+                status='pending'
+            )
+            new_task.products.set(products)
         return Response({
             'message': 'Task completed successfully',
+            'current_task': user.tasks_completed,
             'earnings': task.earnings
         }, status=status.HTTP_200_OK)
     except Task.DoesNotExist:
         return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reset_account(request):
+    user = request.user
+    if Task.objects.filter(user=user, status__in=['pending', 'in-progress']).exists():
+        return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
+    if Withdrawal.objects.filter(user=user, status='pending').exists():
+        return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
+    user.balance = 50.00  # Reset to $50 bonus
+    user.current_set = 0
+    user.tasks_completed = 0
+    user.can_invite = False
+    user.tasks_reset_required = False
+    Task.objects.filter(user=user).delete()
+    user.save()
+    return Response({'message': 'Account reset successfully'}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def invite_friend(request):
+    if Task.objects.filter(user=request.user, status__in=['pending', 'in-progress']).exists():
+        return Response({'error': 'Complete all tasks before inviting'}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = InvitationSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        invitation = serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -360,7 +416,7 @@ def make_deposit(request):
 @permission_classes([IsAuthenticated])
 def request_withdrawal(request):
     user = request.user
-    if Task.objects.filter(user=user, status='pending').exists():
+    if Task.objects.filter(user=user, status__in=['pending', 'in-progress']).exists():
         return Response({'error': 'Complete all tasks before withdrawing'}, status=status.HTTP_400_BAD_REQUEST)
     pin = request.data.get('withdrawal_password')
     if user.withdrawal_password != pin:
@@ -383,7 +439,6 @@ def request_withdrawal(request):
 def get_invitations(request):
     invitations = Invitation.objects.filter(referrer=request.user).order_by('-created_at')
     serializer = InvitationSerializer(invitations, many=True)
-    
     team_size = invitations.count()
     active_members = 0
     referral_earnings = 0
@@ -396,7 +451,6 @@ def get_invitations(request):
             referral_earnings += deposits * 0.1
         except User.DoesNotExist:
             continue
-    
     return Response({
         'invitations': serializer.data,
         'team_size': team_size,
@@ -407,25 +461,21 @@ def get_invitations(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_all_withdrawals(request):
-    """List all withdrawals for admin or user's own withdrawals"""
     if request.user.is_staff:
         withdrawals = Withdrawal.objects.all().order_by('-created_at')
     else:
         withdrawals = Withdrawal.objects.filter(user=request.user).order_by('-created_at')
-    
     serializer = WithdrawalListSerializer(withdrawals, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_withdrawal_details(request, withdrawal_id):
-    """Get specific withdrawal details"""
     try:
         if request.user.is_staff:
             withdrawal = Withdrawal.objects.get(id=withdrawal_id)
         else:
             withdrawal = Withdrawal.objects.get(id=withdrawal_id, user=request.user)
-        
         serializer = WithdrawalListSerializer(withdrawal)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Withdrawal.DoesNotExist:
@@ -434,18 +484,14 @@ def get_withdrawal_details(request, withdrawal_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def complete_withdrawal(request, withdrawal_id):
-    """Complete or reject a withdrawal (admin only in production)"""
     try:
         withdrawal = Withdrawal.objects.get(id=withdrawal_id)
-        
         if withdrawal.status != 'pending':
             return Response({
                 'error': f'Cannot modify withdrawal with status: {withdrawal.status}'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
         action = request.data.get('action', 'approve')
         admin_notes = request.data.get('admin_notes', '')
-        
         if action == 'approve':
             withdrawal.status = 'completed'
             withdrawal.processed_at = timezone.now()
@@ -458,15 +504,12 @@ def complete_withdrawal(request, withdrawal_id):
             message = 'Withdrawal rejected and amount refunded'
         else:
             return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
-        
         withdrawal.save()
-        
         serializer = WithdrawalListSerializer(withdrawal)
         return Response({
             'message': message,
             'withdrawal': serializer.data
         }, status=status.HTTP_200_OK)
-        
     except Withdrawal.DoesNotExist:
         return Response({'error': 'Withdrawal not found'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
@@ -475,19 +518,14 @@ def complete_withdrawal(request, withdrawal_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def bulk_complete_withdrawals(request):
-    """Complete multiple withdrawals at once (admin only)"""
     withdrawal_ids = request.data.get('withdrawal_ids', [])
     action = request.data.get('action', 'approve')
-    
     if not withdrawal_ids:
         return Response({'error': 'No withdrawal IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
-    
     try:
         withdrawals = Withdrawal.objects.filter(id__in=withdrawal_ids, status='pending')
-        
         if not withdrawals.exists():
             return Response({'error': 'No pending withdrawals found'}, status=status.HTTP_404_NOT_FOUND)
-        
         updated_count = 0
         for withdrawal in withdrawals:
             if action == 'approve':
@@ -498,29 +536,23 @@ def bulk_complete_withdrawals(request):
                 withdrawal.processed_at = timezone.now()
                 withdrawal.user.balance += withdrawal.amount
                 withdrawal.user.save()
-            
             withdrawal.save()
             updated_count += 1
-        
         return Response({
             'message': f'{updated_count} withdrawals {action}d successfully'
         }, status=status.HTTP_200_OK)
-        
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_enhanced_transaction_history(request):
-    """Enhanced transaction history with summaries"""
     user = request.user
     deposits = Deposit.objects.filter(user=user).order_by('-created_at')
     withdrawals = Withdrawal.objects.filter(user=user).order_by('-created_at')
-    
     total_deposits = deposits.filter(status='confirmed').aggregate(total=Sum('amount'))['total'] or 0
     total_withdrawals = withdrawals.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
     pending_withdrawals = withdrawals.filter(status='pending').aggregate(total=Sum('amount'))['total'] or 0
-    
     data = {
         'deposits': deposits,
         'withdrawals': withdrawals,
@@ -528,7 +560,6 @@ def get_enhanced_transaction_history(request):
         'total_withdrawals': total_withdrawals,
         'pending_withdrawals': pending_withdrawals
     }
-    
     serializer = EnhancedTransactionHistorySerializer(data)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -575,15 +606,19 @@ def create_support_ticket(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def reset_account(request):
-    user = request.user
-    if Task.objects.filter(user=user, status='pending').exists():
-        return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-    if Withdrawal.objects.filter(user=user, status='pending').exists():
-        return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-    user.balance = 0
-    user.save()
-    return Response({'message': 'Account reset successfully'}, status=status.HTTP_200_OK)
-    
+def get_balance(request):
+    return Response({'balance': request.user.balance}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_vip_level(request):
+    return Response({'vip_level': request.user.vip_level}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_campaigns(request):
+    campaigns = Campaign.objects.filter(is_active=True, end_date__gte=timezone.now()).order_by('-created_at')
+    serializer = CampaignSerializer(campaigns, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
