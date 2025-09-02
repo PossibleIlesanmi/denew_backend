@@ -6,6 +6,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Sum
 from django.core.mail import send_mail
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db import transaction
 from .serializers import (
     WithdrawalCompletionSerializer, WithdrawalListSerializer, AdminWithdrawalActionSerializer,
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer, TaskSerializer,
@@ -19,10 +22,10 @@ from datetime import timedelta
 import random
 import string
 import os
+import logging
 from django.conf import settings
 
-# In-memory store for verification codes (use Redis or database in production)
-verification_codes = {}
+logger = logging.getLogger(__name__)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -37,7 +40,6 @@ def register_user(request):
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        UserProfile.objects.get_or_create(user=user)
         tokens = get_tokens_for_user(user)
         user_data = UserSerializer(user).data
         return Response({
@@ -56,11 +58,7 @@ def login_user(request):
     serializer = UserLoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
-        refresh = RefreshToken.for_user(user)
-        tokens = {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }
+        tokens = get_tokens_for_user(user)
         user_data = UserSerializer(user).data
         return Response({
             'message': 'Login successful',
@@ -311,7 +309,7 @@ def reset_account(request):
         return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
     if Withdrawal.objects.filter(user=user, status='pending').exists():
         return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-    user.balance = 50.00  # Reset to $50 bonus
+    user.balance = 50.00
     user.current_set = 0
     user.tasks_completed = 0
     user.can_invite = False
@@ -405,7 +403,7 @@ def make_deposit(request):
         deposit = serializer.save(user=request.user)
         request.user.balance += deposit.amount
         request.user.save()
-        referrer = User.objects.filter(referrals__referee_email=request.user.email).first()
+        referrer = User.objects.filter(invitations_sent__referee_email=request.user.email, invitations_sent__status='accepted').first()
         if referrer:
             referrer.balance += deposit.amount * 0.1
             referrer.save()
