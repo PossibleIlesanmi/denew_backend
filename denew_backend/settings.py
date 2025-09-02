@@ -12,7 +12,8 @@ SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')  #
 DEBUG = config('DEBUG', default=False, cast=bool)  # Set to False for production on Render
 
 # ALLOWED_HOSTS must include Render's domain and frontend domain
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='denew-backend.onrender.com,*.onrender.com,denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='denew-backend.onrender.com,*.onrender.com,denew-hub.com,www.denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,7 +29,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Added for CORS
+    'corsheaders.middleware.CorsMiddleware',  # Added for CORS - MUST be at the top
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # For serving static files if needed
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -148,8 +149,44 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='plwr zafs ocxo eydg')  # Use app password for Gmail
 DEFAULT_FROM_EMAIL = 'from@denew.com'
 
-# CORS settings for frontend integration
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='https://denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
+# CORS settings for frontend integration - FIXED to include both www and non-www versions
+CORS_ALLOWED_ORIGINS = [
+    "https://www.denew-hub.com",  # Your main frontend domain
+    "https://denew-hub.com",     # Non-www version
+]
+
+# Alternative: Use environment variable for flexibility
+# CORS_ALLOWED_ORIGINS = config(
+#     'CORS_ALLOWED_ORIGINS', 
+#     default='https://www.denew-hub.com,https://denew-hub.com', 
+#     cast=lambda v: [s.strip() for s in v.split(',')]
+# )
+
+# CORS additional settings for better compatibility
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOWED_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# For development/debugging only - REMOVE in production
+# CORS_ALLOW_ALL_ORIGINS = True  # Only use this for testing
 
 # Production settings
 if not DEBUG:
@@ -158,6 +195,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
     X_FRAME_OPTIONS = 'DENY'
+    
+    # CORS settings for production
+    CORS_ALLOW_ALL_ORIGINS = False  # Ensure this is False in production
 
 # Security headers (optional for Render)
 SECURE_HSTS_SECONDS = 3600
