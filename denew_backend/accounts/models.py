@@ -4,9 +4,9 @@ from django.utils import timezone
 import uuid
 
 class User(AbstractUser):
-    full_name = models.CharField(max_length=255)
-    phone_number = models.CharField(max_length=20)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=50.00)
+    full_name = models.CharField(max_length=255, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     vip_level = models.CharField(
         max_length=50,
         choices=[('VIP 0', 'VIP 0'), ('VIP 1', 'VIP 1'), ('VIP 2', 'VIP 2'), ('VIP 3', 'VIP 3'), ('VIP 4', 'VIP 4')],
@@ -20,7 +20,7 @@ class User(AbstractUser):
     email_notifications = models.BooleanField(default=True)
     sms_notifications = models.BooleanField(default=False)
     twofa_enabled = models.BooleanField(default=False)
-    profile_picture = models.CharField(max_length=255, blank=True)
+    profile_picture = models.CharField(max_length=255, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
     withdrawal_password = models.CharField(max_length=4, blank=True)
 
@@ -34,7 +34,7 @@ class User(AbstractUser):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    avatar = models.CharField(max_length=255, blank=True)
+    avatar = models.CharField(max_length=255, blank=True, null=True)
     bio = models.TextField(blank=True)
     location = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)

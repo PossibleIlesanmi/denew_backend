@@ -9,6 +9,7 @@ from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
+from decimal import Decimal
 from .serializers import (
     WithdrawalCompletionSerializer, WithdrawalListSerializer, AdminWithdrawalActionSerializer,
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer, TaskSerializer,
@@ -46,7 +47,7 @@ def register_user(request):
         tokens = get_tokens_for_user(user)
         user_data = UserSerializer(user).data
         return Response({
-            'message': 'Registration successful! You have received a $50 bonus.',
+            'message': 'Registration successful! Your account has been credited with a $50 bonus.',
             'user': user_data,
             'tokens': tokens
         }, status=status.HTTP_201_CREATED)
@@ -224,8 +225,8 @@ def start_task_set(request):
     user.tasks_reset_required = False
     user.save()
     task_type = 'combined' if user.balance > 500 else 'normal'
-    earnings_rate = {'VIP 0': 0.005, 'VIP 1': 0.005, 'VIP 2': 0.01, 'VIP 3': 0.015, 'VIP 4': 0.02}
-    earnings = user.balance * earnings_rate.get(user.vip_level, 0.005) * (5 if task_type == 'combined' else 1)
+    earnings_rate = {'VIP 0': Decimal('0.005'), 'VIP 1': Decimal('0.005'), 'VIP 2': Decimal('0.01'), 'VIP 3': Decimal('0.015'), 'VIP 4': Decimal('0.02')}
+    earnings = user.balance * earnings_rate.get(user.vip_level, Decimal('0.005')) * (5 if task_type == 'combined' else 1)
     products = random.sample(list(Product.objects.all()), min(4 if task_type == 'combined' else 1, Product.objects.count()))
     task = Task.objects.create(
         user=user,

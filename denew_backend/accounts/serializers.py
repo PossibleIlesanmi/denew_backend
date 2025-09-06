@@ -13,10 +13,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     referral_code = serializers.CharField(required=False, allow_blank=True)
     withdrawal_password = serializers.CharField(write_only=True, min_length=4, max_length=4, required=True)
+    full_name = serializers.CharField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'full_name', 'phone_number', 'referral_code', 'withdrawal_password']
+
+    def validate_withdrawal_password(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("Withdrawal PIN must be a 4-digit number")
+        return value
 
     def validate(self, data):
         if User.objects.filter(email=data['email']).exists():
@@ -33,7 +40,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             full_name=validated_data.get('full_name', ''),
             phone_number=validated_data.get('phone_number', ''),
             referral_code=validated_data.get('referral_code', ''),
-            withdrawal_password=validated_data.get('withdrawal_password', '')
+            withdrawal_password=validated_data.get('withdrawal_password', ''),
+            balance=Decimal('50.00')  # $50 bonus
         )
         UserProfile.objects.create(user=user)
         return user

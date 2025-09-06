@@ -186,8 +186,8 @@ CORS_ALLOWED_METHODS = [
     'PUT',
 ]
 
-# For development/debugging only - REMOVE in production
-# CORS_ALLOW_ALL_ORIGINS = True  # Only use this for testing
+# Ensure CORS is properly configured for production
+CORS_ALLOW_ALL_ORIGINS = False  # Explicitly set to False for production
 
 # Production settings
 if not DEBUG:
