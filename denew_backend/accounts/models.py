@@ -137,6 +137,8 @@ class Withdrawal(models.Model):
 
 class TermsAndConditions(models.Model):
     content = models.TextField()
+    version = models.CharField(max_length=10, default='1.0')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -160,7 +162,14 @@ class SupportTicket(models.Model):
         choices=[('open', 'Open'), ('in-progress', 'In Progress'), ('closed', 'Closed')],
         default='open'
     )
+    priority = models.CharField(
+        max_length=20,
+        choices=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('urgent', 'Urgent')],
+        default='medium'
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'accounts_supportticket'

@@ -12,7 +12,7 @@ SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')  #
 DEBUG = config('DEBUG', default=False, cast=bool)  # Set to False for production on Render
 
 # ALLOWED_HOSTS must include Render's domain and frontend domain
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='denew-backend.onrender.com,*.onrender.com,denew-hub.com,www.denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,denew-backend.onrender.com,*.onrender.com,denew-hub.com,www.denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -24,7 +24,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'accounts',
+    'denew_backend.accounts',
     'corsheaders',  # For CORS support
 ]
 
@@ -45,7 +45,7 @@ ROOT_URLCONF = 'denew_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # Empty since no frontend templates are served by backend
+        'DIRS': [os.path.join(BASE_DIR, 'Frontend/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -133,7 +133,8 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For admin statics
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # For Render
 
 MEDIA_URL = '/media/'
@@ -190,7 +191,7 @@ CORS_ALLOWED_METHODS = [
 
 # Production settings
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # SECURE_SSL_REDIRECT = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True

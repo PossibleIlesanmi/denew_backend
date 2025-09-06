@@ -162,19 +162,17 @@ class DepositAdmin(admin.ModelAdmin):
 
 # TermsAndConditions Admin
 class TermsAndConditionsAdmin(admin.ModelAdmin):
-    list_display = ('version', 'content', 'is_active', 'created_at')
+    list_display = ('version', 'is_active', 'created_at')
     list_filter = ('is_active', 'created_at')
     search_fields = ('content', 'version')
-    list_per_page = 25
 
-# Portfolio Admin
 class PortfolioAdmin(admin.ModelAdmin):
     list_display = ('user', 'total_value', 'updated_at')
     list_filter = ('updated_at',)
     search_fields = ('user__username', 'user__email')
     list_per_page = 25
 
-# SupportTicket Admin
+
 class SupportTicketAdmin(admin.ModelAdmin):
     list_display = ('user', 'subject', 'priority', 'status', 'created_at')
     list_filter = ('priority', 'status', 'created_at')

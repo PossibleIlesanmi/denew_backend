@@ -24,7 +24,10 @@ import string
 import os
 import logging
 from django.conf import settings
+from django.shortcuts import render
 
+def index(request):
+    return render(request, 'index.html')
 logger = logging.getLogger(__name__)
 
 def get_tokens_for_user(user):
