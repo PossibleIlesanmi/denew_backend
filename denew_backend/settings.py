@@ -68,16 +68,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='denew_db'),
-        'USER': config('DB_USER', default='denew_user'),
-        'PASSWORD': config('DB_PASSWORD', default='newpassword123'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# Use DATABASE_URL environment variable for Render deployment
+DATABASE_URL = config('DATABASE_URL', default=None)
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='denew_db'),
+            'USER': config('DB_USER', default='denew_user'),
+            'PASSWORD': config('DB_PASSWORD', default='newpassword123'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
