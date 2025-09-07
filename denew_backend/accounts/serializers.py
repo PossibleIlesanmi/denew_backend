@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from django.utils import timezone
 from decimal import Decimal
-from rest_framework_simplejwt.tokens import RefreshToken  # Added import
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Task, Deposit, Withdrawal, Invitation, TermsAndConditions, UserProfile, Portfolio, SupportTicket, Product, Campaign
 
 User = get_user_model()
@@ -57,7 +57,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'access': str(tokens.access_token),
             'refresh': str(tokens)
         }
-        return representationfrom 
+        return representation
 
 
 class UserLoginSerializer(serializers.Serializer):
