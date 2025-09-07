@@ -10,8 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')
 
-# Enable DEBUG for debugging
-DEBUG = config('DEBUG', default=True, cast=bool)
+# DEBUG should be False in production
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Allowed hosts for Render and frontend
 ALLOWED_HOSTS = config(
@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'denew_backend.accounts',
+    'core',
 ]
 
 MIDDLEWARE = [
@@ -69,13 +70,26 @@ WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
 # Use DATABASE_URL environment variable for Render deployment
-DATABASE_URL = config('DATABASE_URL', default='postgres://denew_user:newpassword123@localhost:5432/denew_db')
-DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL,
-        conn_max_age=600
-    )
-}
+if 'DATABASE_URL' in os.environ:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ['DATABASE_URL'],
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    # Fallback for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='denew_db'),
+            'USER': config('DB_USER', default='denew_user'),
+            'PASSWORD': config('DB_PASSWORD', default='newpassword123'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -141,7 +155,14 @@ USE_TZ = True
 # Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+# Only include static dirs if they exist
+static_dir = os.path.join(BASE_DIR, 'static')
+if os.path.exists(static_dir):
+    STATICFILES_DIRS = [static_dir]
+else:
+    STATICFILES_DIRS = []
+
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
@@ -174,13 +195,13 @@ CORS_ALLOWED_HEADERS = [
     'x-requested-with',
 ]
 
-# Logging for debugging
+# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message} {exc_info}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
@@ -189,22 +210,16 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'debug.log'),
-            'formatter': 'verbose',
-        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'handlers': ['console'],
+            'level': 'INFO',
             'propagate': False,
         },
         'denew_backend': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'handlers': ['console'],
+            'level': 'INFO',
             'propagate': False,
         },
     },

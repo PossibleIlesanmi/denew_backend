@@ -5,8 +5,12 @@ __pycache__/
 .Python
 env/
 venv/
+new_venv/
 db.sqlite3
 *.log
 staticfiles/
 media/
 .env
+.DS_Store
+*.sqlite3
+debug.log
