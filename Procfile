@@ -1,1 +1,0 @@
-web: gunicorn denew_backend.wsgi:application --log-file -
