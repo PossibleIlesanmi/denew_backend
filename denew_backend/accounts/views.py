@@ -25,11 +25,12 @@ import string
 import os
 import logging
 from django.conf import settings
-from django.shortcuts import render
+from django.http import HttpResponseRedirect
+
+logger = logging.getLogger(__name__)
 
 def index(request):
-    return render(request, 'index.html')
-logger = logging.getLogger(__name__)
+    return HttpResponseRedirect('https://denew-hub.com')  # Redirect to frontend
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -41,21 +42,31 @@ def get_tokens_for_user(user):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
-    serializer = UserRegistrationSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.save()
-        tokens = get_tokens_for_user(user)
-        user_data = UserSerializer(user).data
+    try:
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            tokens = get_tokens_for_user(user)
+            user_data = UserSerializer(user).data
+            logger.info(f"User registered: {user.username}")
+            return Response({
+                'message': 'Registration successful! Your account has been credited with a $50 bonus.',
+                'user': user_data,
+                'tokens': tokens
+            }, status=status.HTTP_201_CREATED)
+        logger.warning(f"Registration failed: {serializer.errors}")
         return Response({
-            'message': 'Registration successful! Your account has been credited with a $50 bonus.',
-            'user': user_data,
-            'tokens': tokens
-        }, status=status.HTTP_201_CREATED)
-    return Response({
-        'message': 'Registration failed',
-        'errors': serializer.errors
-    }, status=status.HTTP_400_BAD_REQUEST)
+            'message': 'Registration failed',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}", exc_info=True)
+        return Response({
+            'message': 'Server error',
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# Keep the rest of the views unchanged...
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):

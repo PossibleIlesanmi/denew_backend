@@ -13,15 +13,14 @@ class User(AbstractUser):
         default='VIP 0'
     )
     can_invite = models.BooleanField(default=False)
-    # Commenting out current_set as it doesn't exist in production DB
-    # current_set = models.IntegerField(default=0)
+    current_set = models.IntegerField(default=0)
     tasks_completed = models.IntegerField(default=0)
     tasks_reset_required = models.BooleanField(default=False)
     referral_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email_notifications = models.BooleanField(default=True)
     sms_notifications = models.BooleanField(default=False)
     twofa_enabled = models.BooleanField(default=False)
-    profile_picture = models.CharField(max_length=255, blank=True, null=True)
+    profile_picture = models.CharField(max_length=255, blank=True)
     is_verified = models.BooleanField(default=False)
     withdrawal_password = models.CharField(max_length=4, blank=True)
 
@@ -35,10 +34,10 @@ class User(AbstractUser):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    avatar = models.CharField(max_length=255, blank=True, null=True)
-    bio = models.TextField(blank=True, null=True)
-    location = models.CharField(max_length=100, blank=True, null=True)
-    website = models.URLField(blank=True, null=True)
+    avatar = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    website = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

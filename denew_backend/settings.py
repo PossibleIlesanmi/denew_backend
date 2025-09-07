@@ -10,8 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')
 
-# Enable DEBUG temporarily for debugging
-DEBUG = config('DEBUG', default=True, cast=bool)  # Set to True for debugging
+# Enable DEBUG for debugging
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Allowed hosts for Render and frontend
 ALLOWED_HOSTS = config(
@@ -32,11 +32,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    'denew_backend.accounts',  # Matches your app structure
+    'denew_backend.accounts',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must be first
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -52,7 +52,7 @@ ROOT_URLCONF = 'denew_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'Frontend/templates')],
+        'DIRS': [],  # No templates needed since frontend is on Namecheap
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -67,14 +67,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
-# Database configuration for Render PostgreSQL
+# Database configuration
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL', default='postgresql://denew_db_user:61zA8zWjrruwbYUIoUokhX93NwQaArlG@dpg-d2pg22re5dus73b3m5dg-a.oregon-postgres.render.com/denew_db'),
-        conn_max_age=600,
-        conn_health_checks=True,
-        engine='django.db.backends.postgresql',
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME', default='denew_db'),
+        'USER': config('DB_USER', default='denew_user'),
+        'PASSWORD': config('DB_PASSWORD', default='newpassword123'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
+    }
 }
 
 # Custom user model
@@ -86,7 +88,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Allow unauthenticated access for registration
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -150,12 +152,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
+# CORS settings for frontend integration - FIXED to include both www and non-www versions
 # Email configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='plwr zafs ocxo eydg')
 DEFAULT_FROM_EMAIL = 'from@denew.com'
@@ -189,7 +188,6 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
@@ -213,6 +211,12 @@ LOGGING = {
         },
     },
 }
+
+# For development/debugging only - REMOVE in production
+# CORS_ALLOW_ALL_ORIGINS = True  # Only use this for testing
+
+# CORS settings for production
+CORS_ALLOW_ALL_ORIGINS = False  # Ensure this is False in production
 
 # Security settings for production
 if not DEBUG:

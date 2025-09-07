@@ -10,6 +10,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveField(
+            model_name='user',
+            name='current_set',
+        ),
         migrations.AlterField(
             model_name='userprofile',
             name='bio',
@@ -24,15 +28,5 @@ class Migration(migrations.Migration):
             model_name='userprofile',
             name='website',
             field=models.URLField(blank=True, null=True),
-        ),
-        migrations.AlterField(
-            model_name='userprofile',
-            name='avatar',
-            field=models.CharField(blank=True, max_length=255, null=True),
-        ),
-        migrations.AlterField(
-            model_name='user',
-            name='profile_picture',
-            field=models.CharField(blank=True, max_length=255, null=True),
         ),
     ]
