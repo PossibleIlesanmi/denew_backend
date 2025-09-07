@@ -681,7 +681,13 @@ def get_terms(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_portfolio(request):
-    portfolio = Portfolio.objects.get_or_create(user=request.user)[0]
+    portfolio, created = Portfolio.objects.get_or_create(
+        user=request.user,
+        defaults={'total_value': 10.00, 'assets': [], 'updated_at': timezone.now()}
+    )
+    if created or portfolio.total_value == 0:
+        portfolio.total_value = 10.00  # Ensure welcome bonus
+        portfolio.save()
     serializer = PortfolioSerializer(portfolio)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
