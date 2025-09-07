@@ -69,15 +69,24 @@ WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
 # Use DATABASE_URL environment variable for Render deployment
-if 'DATABASE_URL' in os.environ:
+print(f"Environment Variables Check:")
+print(f"DATABASE_URL in os.environ: {'DATABASE_URL' in os.environ}")
+print(f"DATABASE_URL from config: {config('DATABASE_URL', default='NOT_SET')}")
+print(f"All environment variables: {list(os.environ.keys())}")
+
+# Check for Render-specific environment variables
+if 'DATABASE_URL' in os.environ or config('DATABASE_URL', default=None):
+    database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL')
+    print(f"Using DATABASE_URL: {database_url[:50]}...")
     DATABASES = {
         'default': dj_database_url.config(
-            default=os.environ['DATABASE_URL'],
+            default=database_url,
             conn_max_age=600,
             conn_health_checks=True,
         )
     }
 else:
+    print("Using local development database configuration")
     # Fallback for local development
     DATABASES = {
         'default': {
@@ -89,6 +98,8 @@ else:
             'PORT': config('DB_PORT', default='5432'),
         }
     }
+
+print(f"Final DATABASES config: {DATABASES}")
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
