@@ -402,7 +402,7 @@ def reset_account(request):
         return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
     if Withdrawal.objects.filter(user=user, status='pending').exists():
         return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-     user.balance = 10.00
+    user.balance = 10.00
     user.current_set = 0
     user.tasks_completed = 0
     user.can_invite = False
