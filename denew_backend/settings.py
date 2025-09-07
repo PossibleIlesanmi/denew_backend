@@ -1,19 +1,26 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from decouple import config  # For environment variables
+from decouple import config
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Use environment variable for SECRET_KEY
-SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')  # Your provided key
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')
 
-DEBUG = config('DEBUG', default=False, cast=bool)  # Set to False for production on Render
+# Enable DEBUG temporarily for debugging
+DEBUG = config('DEBUG', default=True, cast=bool)  # Set to True for debugging
 
-# ALLOWED_HOSTS must include Render's domain and frontend domain
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,denew-backend.onrender.com,*.onrender.com,denew-hub.com,www.denew-hub.com', cast=lambda v: [s.strip() for s in v.split(',')])
+# Allowed hosts for Render and frontend
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='127.0.0.1,localhost,denew-backend.onrender.com,*.onrender.com,denew-hub.com,www.denew-hub.com',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -24,14 +31,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'denew_backend.accounts',
-    'corsheaders',  # For CORS support
+    'corsheaders',
+    'denew_backend.accounts',  # Matches your app structure
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Added for CORS - MUST be at the top
+    'corsheaders.middleware.CorsMiddleware',  # Must be first
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # For serving static files if needed
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -60,34 +67,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
-# Use Render's PostgreSQL database
-import dj_database_url
+# Database configuration for Render PostgreSQL
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgresql://denew_db_user:61zA8zWjrruwbYUIoUokhX93NwQaArlG@dpg-d2pg22re5dus73b3m5dg-a.oregon-postgres.render.com/denew_db',
+        default=config('DATABASE_URL', default='postgresql://denew_db_user:61zA8zWjrruwbYUIoUokhX93NwQaArlG@dpg-d2pg22re5dus73b3m5dg-a.oregon-postgres.render.com/denew_db'),
         conn_max_age=600,
         conn_health_checks=True,
+        engine='django.db.backends.postgresql',
     )
 }
 
+# Custom user model
 AUTH_USER_MODEL = 'accounts.User'
 
+# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # Allow unauthenticated access for registration
     ],
-    'DEFAULT_SESSION_AUTHENTICATION_CLASSES': [],  # Disable session auth
 }
 
+# JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': True,  # Track last login
+    'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
@@ -104,20 +113,16 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
     'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
     'JTI_CLAIM': 'jti',
-    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
+# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 6,
-        }
+        'OPTIONS': {'min_length': 6},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -127,82 +132,94 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Africa/Lagos'  # Matches WAT (West Africa Time)
+TIME_ZONE = 'Africa/Lagos'
 USE_I18N = True
 USE_TZ = True
 
+# Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # For Render
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Email configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='plwr zafs ocxo eydg')  # Use app password for Gmail
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='plwr zafs ocxo eydg')
 DEFAULT_FROM_EMAIL = 'from@denew.com'
 
-# CORS settings for frontend integration - Updated to include all possible variations
-CORS_ALLOWED_ORIGINS = [
-    "https://www.denew-hub.com",  # Your main frontend domain with www
-    "https://denew-hub.com",     # Non-www version
-    "http://www.denew-hub.com",  # HTTP version with www (if used)
-    "http://denew-hub.com",      # HTTP version without www (if used)
-]
-
-# Alternative: Use environment variable for flexibility
-# CORS_ALLOWED_ORIGINS = config(
-#     'CORS_ALLOWED_ORIGINS', 
-#     default='https://www.denew-hub.com,https://denew-hub.com,http://www.denew-hub.com,http://denew-hub.com', 
-#     cast=lambda v: [s.strip() for s in v.split(',')]
-# )
-
-# CORS additional settings for better compatibility
+# CORS settings
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='https://www.denew-hub.com,https://denew-hub.com,http://www.denew-hub.com,http://denew-hub.com,http://localhost:3000',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
 CORS_ALLOWED_HEADERS = [
     'accept',
-    'accept-encoding',
     'authorization',
     'content-type',
-    'dnt',
     'origin',
-    'user-agent',
     'x-csrftoken',
     'x-requested-with',
 ]
 
-CORS_ALLOWED_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
+# Logging for debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message} {exc_info}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'denew_backend': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
-# For development/debugging only - Temporarily enabled for testing
-CORS_ALLOW_ALL_ORIGINS = True  # Will allow requests from any origin for testing
-
-# Production settings
+# Security settings for production
 if not DEBUG:
-    # SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
-    
-    # CORS settings for production - Temporarily allowing all origins for testing
-    # CORS_ALLOW_ALL_ORIGINS = False  # Commented out to allow all origins for testing
-
-# Security headers (optional for Render)
-SECURE_HSTS_SECONDS = 3600
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
