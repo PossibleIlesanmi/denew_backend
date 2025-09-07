@@ -36,7 +36,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Must be first to handle CORS
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -52,7 +52,7 @@ ROOT_URLCONF = 'denew_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # No templates needed since frontend is on Namecheap
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -68,11 +68,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
-# Prioritize Render environment variables over .env file
 print(f"Environment Variables Check:")
 print(f"DATABASE_URL in os.environ: {'DATABASE_URL' in os.environ}")
 
-# First check os.environ (Render deployment), then fall back to config (.env file)
 database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
 
 if database_url:
@@ -86,7 +84,6 @@ if database_url:
     }
 else:
     print("Using local development database configuration")
-    # Fallback for local development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -165,7 +162,6 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Only include static dirs if they exist
 static_dir = os.path.join(BASE_DIR, 'static')
 if os.path.exists(static_dir):
     STATICFILES_DIRS = [static_dir]
@@ -190,21 +186,32 @@ DEFAULT_FROM_EMAIL = 'from@denew.com'
 # CORS settings
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='https://www.denew-hub.com,https://denew-hub.com,http://www.denew-hub.com,http://denew-hub.com,http://localhost:3000',
+    default='https://www.denew-hub.com,https://denew-hub.com',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
-CORS_ALLOWED_HEADERS = [
+CORS_ALLOW_CREDENTIALS = False  # Set to False since credentials: 'include' is not used
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
     'accept',
+    'accept-encoding',
     'authorization',
     'content-type',
+    'dnt',
     'origin',
+    'user-agent',
     'x-csrftoken',
     'x-requested-with',
 ]
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours for preflight cache
 
-# Logging configuration
+# Logging configuration for debugging CORS
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -231,14 +238,13 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'corsheaders': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
     },
 }
-
-# For development/debugging only - REMOVE in production
-# CORS_ALLOW_ALL_ORIGINS = True  # Only use this for testing
-
-# CORS settings for production
-CORS_ALLOW_ALL_ORIGINS = False  # Ensure this is False in production
 
 # Security settings for production
 if not DEBUG:
