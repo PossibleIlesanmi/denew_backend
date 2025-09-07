@@ -50,7 +50,7 @@ def register_user(request):
             user_data = UserSerializer(user).data
             logger.info(f"User registered: {user.username}")
             return Response({
-                'message': 'Registration successful! Your account has been credited with a $50 bonus.',
+                'message': 'Registration successful! Your account has been credited with a $10 bonus.',
                 'user': user_data,
                 'tokens': tokens
             }, status=status.HTTP_201_CREATED)
@@ -179,17 +179,95 @@ def update_user_profile(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_data(request):
+    """Get dashboard statistics for the authenticated user"""
     user = request.user
-    total_earnings = Task.objects.filter(user=user, status='completed').aggregate(total=Sum('earnings'))['total'] or 0
-    total_tasks = Task.objects.filter(user=user).count()
-    team_members = Invitation.objects.filter(referrer=user).count()
-    user_data = UserSerializer(user).data
-    return Response({
-        'user': user_data,
-        'total_earnings': total_earnings,
-        'total_tasks': total_tasks,
-        'team_members': team_members
-    }, status=status.HTTP_200_OK)
+    
+    try:
+        # Calculate total earnings from completed tasks
+        total_earnings = Task.objects.filter(
+            user=user, 
+            status='completed'
+        ).aggregate(total=Sum('earnings'))['total'] or Decimal('0.00')
+        
+        # Get total completed tasks count
+        total_tasks = Task.objects.filter(
+            user=user, 
+            status='completed'
+        ).count()
+        
+        # Get team members count (invitations sent)
+        team_members = Invitation.objects.filter(referrer=user).count()
+        
+        # Get recent activities (last 5 activities)
+        recent_activities = []
+        
+        # Recent completed tasks
+        recent_tasks = Task.objects.filter(
+            user=user, 
+            status='completed'
+        ).order_by('-completed_at')[:3]
+        
+        for task in recent_tasks:
+            recent_activities.append({
+                'description': f'You completed a task and earned ${task.earnings}',
+                'timestamp': task.completed_at.isoformat() if task.completed_at else task.created_at.isoformat()
+            })
+        
+        # Recent withdrawals
+        recent_withdrawals = Withdrawal.objects.filter(
+            user=user
+        ).order_by('-created_at')[:2]
+        
+        for withdrawal in recent_withdrawals:
+            status_text = {
+                'pending': 'requested withdrawal of',
+                'completed': 'successfully withdrew', 
+                'rejected': 'withdrawal rejected for'
+            }.get(withdrawal.status, 'processed withdrawal of')
+            
+            recent_activities.append({
+                'description': f'You {status_text} ${withdrawal.amount}',
+                'timestamp': withdrawal.created_at.isoformat()
+            })
+        
+        # Recent deposits
+        recent_deposits = Deposit.objects.filter(
+            user=user
+        ).order_by('-created_at')[:2]
+        
+        for deposit in recent_deposits:
+            recent_activities.append({
+                'description': f'You deposited ${deposit.amount}',
+                'timestamp': deposit.created_at.isoformat()
+            })
+        
+        # Sort activities by timestamp and limit to 5
+        recent_activities.sort(key=lambda x: x['timestamp'], reverse=True)
+        recent_activities = recent_activities[:5]
+        
+        # If no activities, show welcome message
+        if not recent_activities:
+            recent_activities = [{
+                'description': 'Welcome! Start your first task to see activity here.',
+                'timestamp': user.date_joined.isoformat()
+            }]
+        
+        return Response({
+            'total_earnings': str(total_earnings),
+            'total_tasks': total_tasks,
+            'team_members': team_members,
+            'recent_activities': recent_activities,
+            'current_balance': str(user.balance),
+            'vip_level': user.vip_level,
+            'user': UserSerializer(user).data
+        })
+        
+    except Exception as e:
+        logger.error(f"Dashboard data error: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to fetch dashboard data'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -324,7 +402,7 @@ def reset_account(request):
         return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
     if Withdrawal.objects.filter(user=user, status='pending').exists():
         return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-    user.balance = 50.00
+     user.balance = 10.00
     user.current_set = 0
     user.tasks_completed = 0
     user.can_invite = False

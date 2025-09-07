@@ -43,7 +43,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             phone_number=validated_data.get('phone_number', ''),
             referral_code=validated_data.get('referral_code', ''),
             withdrawal_password=validated_data.get('withdrawal_password', ''),
-            balance=Decimal('50.00')  # $50 bonus
+           balance=Decimal('10.00')  # $10 bonus
         )
         UserProfile.objects.create(user=user)
         return user
