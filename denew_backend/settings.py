@@ -33,7 +33,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'denew_backend.accounts',
-    'core',
 ]
 
 MIDDLEWARE = [
