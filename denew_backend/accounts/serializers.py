@@ -48,6 +48,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         UserProfile.objects.create(user=user)
         return user
 
+    def to_representation(self, instance):
+        # Include user data and tokens in the response
+        representation = UserSerializer(instance).data
+        tokens = RefreshToken.for_user(instance)
+        representation['tokens'] = {
+            'access': str(tokens.access_token),
+            'refresh': str(tokens)
+        }
+        return representation
+
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)

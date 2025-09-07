@@ -39,33 +39,36 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
-@api_view(['POST'])
+@csrf_exempt
+@api_view(['POST', 'OPTIONS'])
 @permission_classes([AllowAny])
 def register_user(request):
-    try:
-        serializer = UserRegistrationSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            tokens = get_tokens_for_user(user)
-            user_data = UserSerializer(user).data
-            logger.info(f"User registered: {user.username}")
-            return Response({
-                'message': 'Registration successful! Your account has been credited with a $10 bonus.',
-                'user': user_data,
-                'tokens': tokens
-            }, status=status.HTTP_201_CREATED)
-        logger.warning(f"Registration failed: {serializer.errors}")
-        return Response({
-            'message': 'Registration failed',
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.error(f"Registration error: {str(e)}", exc_info=True)
-        return Response({
-            'message': 'Server error',
-            'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    if request.method == 'OPTIONS':
+        # Handle preflight OPTIONS request
+        return Response(status=status.HTTP_200_OK)
 
+    if request.method == 'POST':
+        try:
+            serializer = UserRegistrationSerializer(data=request.data)
+            if serializer.is_valid():
+                user = serializer.save()
+                logger.info(f"User registered: {user.username}")
+                return Response({
+                    'message': 'Registration successful! Your account has been credited with a $10 bonus.',
+                    'user': serializer.data['id'],
+                    'tokens': serializer.data['tokens']
+                }, status=status.HTTP_201_CREATED)
+            logger.warning(f"Registration failed: {serializer.errors}")
+            return Response({
+                'message': 'Registration failed',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            return Response({
+                'message': 'Server error',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 # Keep the rest of the views unchanged...
 @api_view(['POST'])
 @permission_classes([AllowAny])
