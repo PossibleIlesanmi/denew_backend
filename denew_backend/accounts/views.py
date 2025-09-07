@@ -65,7 +65,7 @@ def register_user(request):
                     'email': response_data.get('email'),
                     'balance': str(response_data.get('balance', '10.00')),  # Ensure balance is included
                     'full_name': response_data.get('full_name', ''),
-                    'vip_level': response_data.get('vip_level', 'VIP 0'),
+                    'vip_level': response_data.get('vip_level', 'VIP 1'),
                     'tokens': response_data.get('tokens', {})
                 }, status=status.HTTP_201_CREATED)
             
