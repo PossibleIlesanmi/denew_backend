@@ -68,15 +68,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
-# Use DATABASE_URL environment variable for Render deployment
+# Prioritize Render environment variables over .env file
 print(f"Environment Variables Check:")
 print(f"DATABASE_URL in os.environ: {'DATABASE_URL' in os.environ}")
-print(f"DATABASE_URL from config: {config('DATABASE_URL', default='NOT_SET')}")
-print(f"All environment variables: {list(os.environ.keys())}")
 
-# Check for Render-specific environment variables
-if 'DATABASE_URL' in os.environ or config('DATABASE_URL', default=None):
-    database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL')
+# First check os.environ (Render deployment), then fall back to config (.env file)
+database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
+
+if database_url:
     print(f"Using DATABASE_URL: {database_url[:50]}...")
     DATABASES = {
         'default': dj_database_url.config(
