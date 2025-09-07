@@ -13,7 +13,8 @@ class User(AbstractUser):
         default='VIP 0'
     )
     can_invite = models.BooleanField(default=False)
-    current_set = models.IntegerField(default=0)
+    # Commenting out current_set as it doesn't exist in production DB
+    # current_set = models.IntegerField(default=0)
     tasks_completed = models.IntegerField(default=0)
     tasks_reset_required = models.BooleanField(default=False)
     referral_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
@@ -35,9 +36,9 @@ class User(AbstractUser):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     avatar = models.CharField(max_length=255, blank=True, null=True)
-    bio = models.TextField(blank=True)
-    location = models.CharField(max_length=100, blank=True)
-    website = models.URLField(blank=True)
+    bio = models.TextField(blank=True, null=True)
+    location = models.CharField(max_length=100, blank=True, null=True)
+    website = models.URLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

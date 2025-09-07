@@ -150,16 +150,18 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='plwr zafs ocxo eydg')  # Use app password for Gmail
 DEFAULT_FROM_EMAIL = 'from@denew.com'
 
-# CORS settings for frontend integration - FIXED to include both www and non-www versions
+# CORS settings for frontend integration - Updated to include all possible variations
 CORS_ALLOWED_ORIGINS = [
-    "https://www.denew-hub.com",  # Your main frontend domain
+    "https://www.denew-hub.com",  # Your main frontend domain with www
     "https://denew-hub.com",     # Non-www version
+    "http://www.denew-hub.com",  # HTTP version with www (if used)
+    "http://denew-hub.com",      # HTTP version without www (if used)
 ]
 
 # Alternative: Use environment variable for flexibility
 # CORS_ALLOWED_ORIGINS = config(
 #     'CORS_ALLOWED_ORIGINS', 
-#     default='https://www.denew-hub.com,https://denew-hub.com', 
+#     default='https://www.denew-hub.com,https://denew-hub.com,http://www.denew-hub.com,http://denew-hub.com', 
 #     cast=lambda v: [s.strip() for s in v.split(',')]
 # )
 
@@ -186,8 +188,8 @@ CORS_ALLOWED_METHODS = [
     'PUT',
 ]
 
-# Ensure CORS is properly configured for production
-CORS_ALLOW_ALL_ORIGINS = False  # Explicitly set to False for production
+# For development/debugging only - Temporarily enabled for testing
+CORS_ALLOW_ALL_ORIGINS = True  # Will allow requests from any origin for testing
 
 # Production settings
 if not DEBUG:
@@ -197,8 +199,8 @@ if not DEBUG:
     CSRF_COOKIE_HTTPONLY = True
     X_FRAME_OPTIONS = 'DENY'
     
-    # CORS settings for production
-    CORS_ALLOW_ALL_ORIGINS = False  # Ensure this is False in production
+    # CORS settings for production - Temporarily allowing all origins for testing
+    # CORS_ALLOW_ALL_ORIGINS = False  # Commented out to allow all origins for testing
 
 # Security headers (optional for Render)
 SECURE_HSTS_SECONDS = 3600
