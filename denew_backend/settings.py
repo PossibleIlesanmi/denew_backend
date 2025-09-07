@@ -69,22 +69,13 @@ WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
 # Use DATABASE_URL environment variable for Render deployment
-DATABASE_URL = config('DATABASE_URL', default=None)
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='denew_db'),
-            'USER': config('DB_USER', default='denew_user'),
-            'PASSWORD': config('DB_PASSWORD', default='newpassword123'),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-        }
-    }
+DATABASE_URL = config('DATABASE_URL', default='postgres://denew_user:newpassword123@localhost:5432/denew_db')
+DATABASES = {
+    'default': dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600
+    )
+}
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -159,7 +150,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-# CORS settings for frontend integration - FIXED to include both www and non-www versions
+
 # Email configuration
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
