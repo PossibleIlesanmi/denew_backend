@@ -53,36 +53,7 @@ def register_user(request):
             serializer = UserRegistrationSerializer(data=request.data)
             if serializer.is_valid():
                 user = serializer.save()
-                logger.info(f"User registered: {user.username}")
-                return Response({
-                    'message': 'Registration successful! Your account has been credited with a $10 bonus.',
-                    'user': serializer.data['id'],
-                    'tokens': serializer.data['tokens']
-                }, status=status.HTTP_201_CREATED)
-            logger.warning(f"Registration failed: {serializer.errors}")
-            return Response({
-                'message': 'Registration failed',
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"Registration error: {str(e)}", exc_info=True)
-            return Response({
-                'message': 'Server error',
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)@csrf_exempt
-@api_view(['POST', 'OPTIONS'])
-@permission_classes([AllowAny])
-def register_user(request):
-    if request.method == 'OPTIONS':
-        # Handle preflight OPTIONS request
-        return Response(status=status.HTTP_200_OK)
-
-    if request.method == 'POST':
-        try:
-            serializer = UserRegistrationSerializer(data=request.data)
-            if serializer.is_valid():
-                user = serializer.save()
-                logger.info(f"User registered: {user.username}")
+                logger.info(f"User registered: {user.username} with balance: ${user.balance}")
                 
                 # Get the serialized data which includes user data and tokens
                 response_data = serializer.to_representation(user)
@@ -92,7 +63,9 @@ def register_user(request):
                     'user_id': user.id,
                     'username': response_data.get('username'),
                     'email': response_data.get('email'),
-                    'balance': response_data.get('balance'),
+                    'balance': str(response_data.get('balance', '10.00')),  # Ensure balance is included
+                    'full_name': response_data.get('full_name', ''),
+                    'vip_level': response_data.get('vip_level', 'VIP 0'),
                     'tokens': response_data.get('tokens', {})
                 }, status=status.HTTP_201_CREATED)
             
