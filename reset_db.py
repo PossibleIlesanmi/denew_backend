@@ -1,19 +1,24 @@
 import os
 import shutil
 import subprocess
+from decouple import config
+
+# Get database configuration from .env file
+DB_NAME = config('DB_NAME', default='denew_db')
+DB_USER = config('DB_USER', default='denew_user')
 
 # Reset PostgreSQL database
 try:
     # Drop database if it exists
-    subprocess.run(['psql', '-U', 'denew_user', '-c', 'DROP DATABASE IF EXISTS denew_db;'], check=False)
-    print('Existing database dropped if it existed.')
+    subprocess.run(['psql', '-U', DB_USER, '-c', f'DROP DATABASE IF EXISTS {DB_NAME};'], check=False)
+    print(f'Existing database {DB_NAME} dropped if it existed.')
     
     # Create a new empty database
-    subprocess.run(['psql', '-U', 'denew_user', '-c', 'CREATE DATABASE denew_db;'], check=True)
-    print('New empty PostgreSQL database created.')
+    subprocess.run(['psql', '-U', DB_USER, '-c', f'CREATE DATABASE {DB_NAME};'], check=True)
+    print(f'New empty PostgreSQL database {DB_NAME} created.')
 except Exception as e:
     print(f'Error with PostgreSQL operations: {e}')
-    print('Make sure PostgreSQL is running and credentials are correct in settings.py')
+    print('Make sure PostgreSQL is running and credentials are correct in .env file')
 
 # Find and clean all migration files except __init__.py
 app_dirs = ['accounts', 'core']
@@ -41,11 +46,3 @@ for app in app_dirs:
 print('\nDatabase and migrations reset complete. Now run:')
 print('python manage.py makemigrations')
 print('python manage.py migrate')
-
-print('\nIf you still have migration issues, try:')
-print('1. python manage.py migrate --fake accounts zero')
-print('2. python manage.py migrate --fake admin zero')
-print('3. python manage.py migrate --fake auth zero')
-print('4. python manage.py migrate --fake contenttypes zero')
-print('5. python manage.py migrate --fake sessions zero')
-print('6. python manage.py migrate')

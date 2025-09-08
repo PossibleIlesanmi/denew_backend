@@ -10,8 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='93a333082d89d774a9e940a5de5088bf')
 
-# DEBUG should be False in production
-DEBUG = config('DEBUG', default=False, cast=bool)
+# Enable DEBUG for debugging
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Allowed hosts for Render and frontend
 ALLOWED_HOSTS = config(
@@ -36,7 +36,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must be first to handle CORS
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -52,7 +52,7 @@ ROOT_URLCONF = 'denew_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [],  # No templates needed since frontend is on Namecheap
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -68,22 +68,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'denew_backend.wsgi.application'
 
 # Database configuration
-print(f"Environment Variables Check:")
-print(f"DATABASE_URL in os.environ: {'DATABASE_URL' in os.environ}")
-
-database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
-
-if database_url:
-    print(f"Using DATABASE_URL: {database_url[:50]}...")
+# Use DATABASE_URL environment variable for Render deployment
+DATABASE_URL = config('DATABASE_URL', default=None)
+if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.config(
-            default=database_url,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+        'default': dj_database_url.parse(DATABASE_URL)
     }
 else:
-    print("Using local development database configuration")
+    # Use PostgreSQL for local development
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -94,8 +86,6 @@ else:
             'PORT': config('DB_PORT', default='5432'),
         }
     }
-
-print(f"Final DATABASES config: {DATABASES}")
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -161,13 +151,7 @@ USE_TZ = True
 # Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-static_dir = os.path.join(BASE_DIR, 'static')
-if os.path.exists(static_dir):
-    STATICFILES_DIRS = [static_dir]
-else:
-    STATICFILES_DIRS = []
-
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
@@ -176,7 +160,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
+# CORS settings for frontend integration - FIXED to include both www and non-www versions
 # Email configuration
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='denewhub@gmail.com')
@@ -186,38 +170,27 @@ DEFAULT_FROM_EMAIL = 'from@denew.com'
 # CORS settings
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='https://www.denew-hub.com,https://denew-hub.com',
+    default='https://www.denew-hub.com,https://denew-hub.com,http://www.denew-hub.com,http://denew-hub.com,http://localhost:3000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
-CORS_ALLOW_CREDENTIALS = False  # Set to False since credentials: 'include' is not used
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
+CORS_ALLOWED_HEADERS = [
     'accept',
-    'accept-encoding',
     'authorization',
     'content-type',
-    'dnt',
     'origin',
-    'user-agent',
     'x-csrftoken',
     'x-requested-with',
 ]
-CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours for preflight cache
 
-# Logging configuration for debugging CORS
+# Logging for debugging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            'format': '{levelname} {asctime} {module} {message} {exc_info}',
             'style': '{',
         },
     },
@@ -226,25 +199,32 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'denew_backend': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'corsheaders': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
 }
+
+# For development/debugging only - REMOVE in production
+# CORS_ALLOW_ALL_ORIGINS = True  # Only use this for testing
+
+# CORS settings for production
+CORS_ALLOW_ALL_ORIGINS = False  # Ensure this is False in production
 
 # Security settings for production
 if not DEBUG:

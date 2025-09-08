@@ -116,6 +116,13 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ['id', 'name', 'icon', 'price', 'is_combined']
+        read_only_fields = ['id']
+        
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # Format price to 2 decimal places
+        representation['price'] = f"{instance.price:.2f}"
+        return representation
 
 class TaskSerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True)
@@ -123,7 +130,7 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ['id', 'task_type', 'set_number', 'task_number', 'earnings', 'status', 'products']
-
+        
 class CurrentTaskSerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True)
 
