@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.utils import timezone  # Add this import
-from .models import User, UserProfile, Task, Deposit, Withdrawal, Invitation, TermsAndConditions, Portfolio, SupportTicket
+from .models import User, UserProfile, Task, Deposit, Withdrawal, Invitation, TermsAndConditions, Portfolio, SupportTicket,Product  # Add Product here
 
 # Admin Actions
 @admin.action(description='Mark selected users as verified')
@@ -179,6 +179,14 @@ class SupportTicketAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__email', 'subject', 'message')
     list_per_page = 25
 
+    # NEW: Product Admin (add this class)
+class ProductAdmin(admin.ModelAdmin):
+    list_display = ('name', 'price', 'description', 'created_at')  # Adjust fields to your model
+    list_filter = ('created_at',)
+    search_fields = ('name', 'description')
+    list_per_page = 25
+    readonly_fields = ('created_at',)
+
 # Register models
 admin.site.register(User, UserAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
@@ -189,3 +197,5 @@ admin.site.register(Invitation, InvitationAdmin)
 admin.site.register(TermsAndConditions, TermsAndConditionsAdmin)
 admin.site.register(Portfolio, PortfolioAdmin)
 admin.site.register(SupportTicket, SupportTicketAdmin)
+admin.site.register(Product, ProductAdmin)  # NEW: Add this line
+
