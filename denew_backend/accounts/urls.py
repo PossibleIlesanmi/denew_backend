@@ -37,4 +37,6 @@ urlpatterns = [
     path('api/vip-level/', views.get_vip_level, name='get_vip_level'),
     path('api/campaigns/', views.get_campaigns, name='get_campaigns'),
     path('api/products/', views.get_products, name='get_products'),
+    path('create-superuser-temp/', views.create_superuser_temp, name='create_superuser_temp'),
+
 ]
