@@ -179,13 +179,18 @@ class SupportTicketAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__email', 'subject', 'message')
     list_per_page = 25
 
-    # NEW: Product Admin (add this class)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'description', 'created_at')  # Adjust fields to your model
-    list_filter = ('created_at',)
-    search_fields = ('name', 'description')
-    list_per_page = 25
-    readonly_fields = ('created_at',)
+    list_display = ('name', 'icon', 'price', 'is_combined')  # Use actual fields: name, icon, price, is_combined
+    list_filter = ('is_combined',)  # Filter by BooleanField (e.g., True/False for combined products)
+    search_fields = ('name', 'icon')  # Search by name or icon
+    list_per_page = 25  # Shows 25 products per page (good for your 40 products)
+    
+    # Optional: Allow adding/deleting in admin
+    def has_add_permission(self, request):
+        return True
+    
+    def has_delete_permission(self, request, obj=None):
+        return True
 
 # Register models
 admin.site.register(User, UserAdmin)
@@ -197,5 +202,5 @@ admin.site.register(Invitation, InvitationAdmin)
 admin.site.register(TermsAndConditions, TermsAndConditionsAdmin)
 admin.site.register(Portfolio, PortfolioAdmin)
 admin.site.register(SupportTicket, SupportTicketAdmin)
-admin.site.register(Product, ProductAdmin)  # NEW: Add this line
+admin.site.register(Product, ProductAdmin)
 
