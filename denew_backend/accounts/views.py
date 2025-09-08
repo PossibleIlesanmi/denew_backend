@@ -216,7 +216,13 @@ def dashboard_data(request):
         # Get team members count (invitations sent)
         team_members = Invitation.objects.filter(referrer=user).count()
         
-        # Get recent activities (last 5 activities)
+        # Calculate current balance (sum of confirmed deposits + signup bonus)
+        confirmed_deposits = Deposit.objects.filter(user=user, status='confirmed')
+        deposit_total = confirmed_deposits.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        signup_bonus = Decimal('10.00') if user.date_joined and not user.signup_bonus_applied else Decimal('0.00')
+        current_balance = deposit_total + signup_bonus
+        
+        # Get recent activities (last 5 activities, including confirmed deposits)
         recent_activities = []
         
         # Recent completed tasks
@@ -227,6 +233,7 @@ def dashboard_data(request):
         
         for task in recent_tasks:
             recent_activities.append({
+                'type': 'task',
                 'description': f'You completed a task and earned ${task.earnings}',
                 'timestamp': task.completed_at.isoformat() if task.completed_at else task.created_at.isoformat()
             })
@@ -244,17 +251,20 @@ def dashboard_data(request):
             }.get(withdrawal.status, 'processed withdrawal of')
             
             recent_activities.append({
+                'type': 'withdrawal',
                 'description': f'You {status_text} ${withdrawal.amount}',
                 'timestamp': withdrawal.created_at.isoformat()
             })
         
-        # Recent deposits
+        # Recent confirmed deposits
         recent_deposits = Deposit.objects.filter(
-            user=user
+            user=user,
+            status='confirmed'
         ).order_by('-created_at')[:2]
         
         for deposit in recent_deposits:
             recent_activities.append({
+                'type': 'deposit',
                 'description': f'You deposited ${deposit.amount}',
                 'timestamp': deposit.created_at.isoformat()
             })
@@ -266,7 +276,8 @@ def dashboard_data(request):
         # If no activities, show welcome message
         if not recent_activities:
             recent_activities = [{
-                'description': 'Welcome! Start your first task to see activity here.',
+                'type': 'welcome',
+                'description': 'Welcome! Start your first task or deposit to see activity here.',
                 'timestamp': user.date_joined.isoformat()
             }]
         
@@ -275,10 +286,10 @@ def dashboard_data(request):
             'total_tasks': total_tasks,
             'team_members': team_members,
             'recent_activities': recent_activities,
-            'current_balance': str(user.balance),
+            'current_balance': str(current_balance.quantize(Decimal('0.01'))),  # Ensure 2 decimal places
             'vip_level': user.vip_level,
-            'user': UserSerializer(user).data
-        })
+            'user': UserSerializer(user, context={'request': request}).data
+        }, status=status.HTTP_200_OK)
         
     except Exception as e:
         logger.error(f"Dashboard data error: {str(e)}", exc_info=True)

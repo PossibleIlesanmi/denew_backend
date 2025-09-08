@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    'denew_backend.accounts',
+    'denew_backend.accounts.apps.AccountsConfig',  # Use custom app config to load signals
 ]
 
 MIDDLEWARE = [
