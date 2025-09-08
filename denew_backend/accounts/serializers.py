@@ -59,7 +59,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         }
         return representation
 
-
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -138,8 +137,9 @@ class CurrentTaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = ['id', 'task_type', 'set_number', 'task_number', 'earnings', 'status', 'products', 'created_at', 'completed_at']
 
+# UPDATED: DepositSerializer - Support context for status='confirmed' in API
 class DepositSerializer(serializers.ModelSerializer):
-    status = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=False)  # Allow write for context
     created_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
@@ -152,7 +152,9 @@ class DepositSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        validated_data['status'] = 'pending'
+        # NEW: Use context to set status (e.g., 'confirmed' for API), fallback to 'pending'
+        status = validated_data.get('status') or self.context.get('status', 'pending')
+        validated_data['status'] = status
         return super().create(validated_data)
 
 class WithdrawalSerializer(serializers.ModelSerializer):

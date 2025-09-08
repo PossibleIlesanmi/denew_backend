@@ -3,10 +3,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.db.models import Sum
-from django.contrib.auth import get_user_model  # ADD THIS LINE
-from django.http import HttpResponseRedirect, JsonResponse  # Add JsonResponse if not present
+from django.http import HttpResponseRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
@@ -28,7 +27,9 @@ import string
 import os
 import logging
 from django.conf import settings
-from django.http import HttpResponseRedirect
+
+# NEW: Global dict for verification codes (in-memory; reset on restart. Use Redis for production)
+verification_codes = {}
 
 logger = logging.getLogger(__name__)
 
@@ -84,60 +85,6 @@ def register_user(request):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-#             # Temporary endpoint to create superuser (REMOVE AFTER USE)
-# @csrf_exempt
-# @api_view(['GET'])  # Use GET for simple access via browser; change to POST if preferred
-# @permission_classes([AllowAny])
-# def create_superuser_temp(request):
-#     User = get_user_model()
-#     username = 'DenewAdmin'
-#     email = 'admin@example.com'  # Change if you want a different email
-#     password = 'Possibleand1@'
-    
-#     try:
-#         if User.objects.filter(username=username).exists():
-#             user = User.objects.get(username=username)
-#             if user.is_superuser:
-#                 return JsonResponse({'status': 'exists', 'message': f'Superuser {username} already exists. is_superuser: {user.is_superuser}'})
-#             else:
-#                 return JsonResponse({'status': 'error', 'message': f'User {username} exists but is not a superuser.'})
-        
-#         # Create the superuser
-#         user = User.objects.create_superuser(
-#             username=username,
-#             email=email,
-#             password=password
-#         )
-        
-#         # Set custom field defaults (adjust based on your models.py if errors occur)
-#         user.full_name = ''
-#         user.phone_number = ''
-#         user.balance = Decimal('10.00')
-#         user.vip_level = 'VIP 1'
-#         user.can_invite = False
-#         user.current_set = 0
-#         user.tasks_completed = 0
-#         user.tasks_reset_required = False
-#         # Generate referral code if needed (assuming it's auto-generated in save(), else add:
-#         # import random; import string; user.referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-#         user.email_notifications = True
-#         user.sms_notifications = False
-#         user.twofa_enabled = False
-#         user.profile_picture = ''
-#         user.is_verified = True
-#         user.withdrawal_password = ''  # Or a default 4-digit if required
-        
-#         user.save()
-        
-#         return JsonResponse({
-#             'status': 'success', 
-#             'message': f'Superuser {username} created successfully with email {email}. You can now log in to /admin/ with password {password}.'
-#         })
-        
-#     except Exception as e:
-#         return JsonResponse({'status': 'error', 'message': f'Creation failed: {str(e)}'})
-# Keep the rest of the views unchanged...
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -443,8 +390,8 @@ def submit_task(request):
         user.save()
         if user.tasks_completed < 40:
             task_type = 'combined' if user.balance > 500 else 'normal'
-            earnings_rate = {'VIP 0': 0.005, 'VIP 1': 0.005, 'VIP 2': 0.01, 'VIP 3': 0.015, 'VIP 4': 0.02}
-            earnings = user.balance * earnings_rate.get(user.vip_level, 0.005) * (5 if task_type == 'combined' else 1)
+            earnings_rate = {'VIP 0': Decimal('0.005'), 'VIP 1': Decimal('0.005'), 'VIP 2': Decimal('0.01'), 'VIP 3': Decimal('0.015'), 'VIP 4': Decimal('0.02')}  # FIXED: Use Decimal for consistency
+            earnings = user.balance * earnings_rate.get(user.vip_level, Decimal('0.005')) * (5 if task_type == 'combined' else 1)
             products = random.sample(list(Product.objects.all()), min(4 if task_type == 'combined' else 1, Product.objects.count()))
             new_task = Task.objects.create(
                 user=user,
@@ -473,7 +420,7 @@ def reset_account(request):
         return Response({'error': 'Complete all tasks before resetting'}, status=status.HTTP_400_BAD_REQUEST)
     if Withdrawal.objects.filter(user=user, status='pending').exists():
         return Response({'error': 'Complete all withdrawals before resetting'}, status=status.HTTP_400_BAD_REQUEST)
-    user.balance = 10.00
+    user.balance = Decimal('10.00')  # FIXED: Use Decimal for consistency
     user.current_set = 0
     user.tasks_completed = 0
     user.can_invite = False
@@ -559,18 +506,21 @@ def set_withdrawal_pin(request):
     request.user.save()
     return Response({'message': 'Withdrawal PIN set successfully'}, status=status.HTTP_200_OK)
 
+# UPDATED: make_deposit - Let signal handle user balance; keep referrer bonus
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def make_deposit(request):
-    serializer = DepositSerializer(data=request.data)
+    # Pass context to serializer to set status='confirmed' on save
+    serializer = DepositSerializer(data=request.data, context={'status': 'confirmed'})
     if serializer.is_valid():
-        deposit = serializer.save(user=request.user)
-        request.user.balance += deposit.amount
-        request.user.save()
+        deposit = serializer.save(user=request.user)  # Saves with status='confirmed', triggers signal for user.balance += amount
+        
+        # NEW: Handle referrer bonus manually (signal doesn't cover this)
         referrer = User.objects.filter(invitations_sent__referee_email=request.user.email, invitations_sent__status='accepted').first()
         if referrer:
-            referrer.balance += deposit.amount * 0.1
+            referrer.balance += deposit.amount * Decimal('0.10')  # Use Decimal for precision
             referrer.save()
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -609,15 +559,15 @@ def get_invitations(request):
             referee = User.objects.get(email=invitation.referee_email)
             if referee.last_login and (timezone.now() - referee.last_login).days <= 30:
                 active_members += 1
-            deposits = Deposit.objects.filter(user=referee, status='confirmed').aggregate(total=Sum('amount'))['total'] or 0
-            referral_earnings += deposits * 0.1
+            deposits = Deposit.objects.filter(user=referee, status='confirmed').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            referral_earnings += deposits * Decimal('0.10')  # FIXED: Use Decimal for consistency
         except User.DoesNotExist:
             continue
     return Response({
         'invitations': serializer.data,
         'team_size': team_size,
         'active_members': active_members,
-        'referral_earnings': round(referral_earnings, 2)
+        'referral_earnings': str(referral_earnings.quantize(Decimal('0.01')))  # Round to 2 decimals
     }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
@@ -657,6 +607,8 @@ def complete_withdrawal(request, withdrawal_id):
         if action == 'approve':
             withdrawal.status = 'completed'
             withdrawal.processed_at = timezone.now()
+            withdrawal.user.balance -= withdrawal.amount  # Manual deduct (no signal for withdrawals)
+            withdrawal.user.save()
             message = 'Withdrawal approved successfully'
         elif action == 'reject':
             withdrawal.status = 'rejected'
@@ -693,6 +645,8 @@ def bulk_complete_withdrawals(request):
             if action == 'approve':
                 withdrawal.status = 'completed'
                 withdrawal.processed_at = timezone.now()
+                withdrawal.user.balance -= withdrawal.amount
+                withdrawal.user.save()
             elif action == 'reject':
                 withdrawal.status = 'rejected'
                 withdrawal.processed_at = timezone.now()
@@ -712,15 +666,15 @@ def get_enhanced_transaction_history(request):
     user = request.user
     deposits = Deposit.objects.filter(user=user).order_by('-created_at')
     withdrawals = Withdrawal.objects.filter(user=user).order_by('-created_at')
-    total_deposits = deposits.filter(status='confirmed').aggregate(total=Sum('amount'))['total'] or 0
-    total_withdrawals = withdrawals.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
-    pending_withdrawals = withdrawals.filter(status='pending').aggregate(total=Sum('amount'))['total'] or 0
+    total_deposits = deposits.filter(status='confirmed').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    total_withdrawals = withdrawals.filter(status='completed').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    pending_withdrawals = withdrawals.filter(status='pending').aggregate(total=Sum('amount'))['total'] or Decimal('0')
     data = {
         'deposits': deposits,
         'withdrawals': withdrawals,
-        'total_deposits': total_deposits,
-        'total_withdrawals': total_withdrawals,
-        'pending_withdrawals': pending_withdrawals
+        'total_deposits': str(total_deposits),
+        'total_withdrawals': str(total_withdrawals),
+        'pending_withdrawals': str(pending_withdrawals)
     }
     serializer = EnhancedTransactionHistorySerializer(data)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -739,10 +693,10 @@ def get_terms(request):
 def get_portfolio(request):
     portfolio, created = Portfolio.objects.get_or_create(
         user=request.user,
-        defaults={'total_value': 10.00, 'assets': [], 'updated_at': timezone.now()}
+        defaults={'total_value': Decimal('10.00'), 'assets': [], 'updated_at': timezone.now()}
     )
     if created or portfolio.total_value == 0:
-        portfolio.total_value = 10.00  # Ensure welcome bonus
+        portfolio.total_value = Decimal('10.00')  # Ensure welcome bonus
         portfolio.save()
     serializer = PortfolioSerializer(portfolio)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -777,7 +731,7 @@ def create_support_ticket(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_balance(request):
-    return Response({'balance': request.user.balance}, status=status.HTTP_200_OK)
+    return Response({'balance': str(request.user.balance)}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

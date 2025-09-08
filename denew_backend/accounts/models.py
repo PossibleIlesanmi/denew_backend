@@ -1,6 +1,8 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 import uuid
 
 class User(AbstractUser):
@@ -173,3 +175,30 @@ class SupportTicket(models.Model):
 
     class Meta:
         db_table = 'accounts_supportticket'
+
+# NEW: Signal to auto-update user balance on deposit creation/update (add this at the end)
+@receiver(post_save, sender=Deposit)
+def update_user_balance_on_deposit(sender, instance, created, **kwargs):
+    """
+    Automatically update user balance when a deposit is created or status changes to 'confirmed'.
+    - On create: If status='confirmed', add amount to balance.
+    - On update: If status changed to 'confirmed', add amount (avoids double-adding).
+    """
+    if instance.status != 'confirmed':
+        return  # Skip if not confirmed
+
+    user = instance.user
+    with transaction.atomic():
+        if created:
+            # New deposit: Add if confirmed
+            user.balance += instance.amount
+        else:
+            # Existing deposit: Check if status just changed to confirmed
+            try:
+                old_instance = sender.objects.get(id=instance.id)
+                if old_instance.status != 'confirmed':
+                    user.balance += instance.amount
+            except sender.DoesNotExist:
+                pass  # Rare case, skip
+        
+        user.save(update_fields=['balance'])  # Efficient update, only changes balance
