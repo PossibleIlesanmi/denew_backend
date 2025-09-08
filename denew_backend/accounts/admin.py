@@ -1,12 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
-from django.utils import timezone
-from django.contrib.auth import get_user_model  # Add this for custom User model
-from decimal import Decimal  # Add this for balance handling
+from django.utils import timezone  # Add this import
 from .models import User, UserProfile, Task, Deposit, Withdrawal, Invitation, TermsAndConditions, Portfolio, SupportTicket
-
-User = get_user_model()  # Use custom User model
 
 # Admin Actions
 @admin.action(description='Mark selected users as verified')
@@ -37,33 +33,6 @@ def reject_withdrawals(modeladmin, request, queryset):
             withdrawal.user.save()
             withdrawal.save()
 
-'
-        user.balance = Decimal('10.00')
-        user.vip_level = 'VIP 1'
-        user.can_invite = False
-        user.current_set = 0
-        user.tasks_completed = 0
-        user.tasks_reset_required = False
-        # If referral_code needs generation:
-        # import random; import string; user.referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        user.email_notifications = True
-        user.sms_notifications = False
-        user.twofa_enabled = False
-        user.profile_picture = ''
-        user.is_verified = True
-        user.withdrawal_password = ''
-        
-        user.save()
-        
-        modeladmin.message_user(
-            request, 
-            f'Superuser {username} created successfully with email {email}. Password: {password}. Log in at /admin/.',
-            level='success'
-        )
-        
-    except Exception as e:
-        modeladmin.message_user(request, f'Creation failed: {str(e)}', level='error')
-
 # Inline for UserProfile
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
@@ -71,10 +40,10 @@ class UserProfileInline(admin.StackedInline):
     verbose_name_plural = 'Profile Information'
     fields = ('avatar', 'bio', 'location', 'website')
 
-# Custom User Admin (updated with new action)
+# Custom User Admin
 class UserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline,)
-    actions = [make_verified, make_unverified, create_default_superuser]  # Add the new action here
+    actions = [make_verified, make_unverified]
     list_display = (
         'username', 'email', 'full_name', 'phone_number',
         'verification_badge', 'staff_badge', 'referral_info', 'balance', 'join_date'
@@ -83,10 +52,6 @@ class UserAdmin(BaseUserAdmin):
         'is_staff', 'is_superuser', 'is_active', 'is_verified',
         'date_joined', 'last_login', 'vip_level'
     )
-        
-        # Set custom field defaults (adjust if errors occur)
-        user.full_name = ''
-        user.phone_number = '
     search_fields = ('username', 'email', 'full_name', 'phone_number', 'referral_code')
     ordering = ('-date_joined',)
     list_per_page = 25
@@ -206,6 +171,7 @@ class PortfolioAdmin(admin.ModelAdmin):
     list_filter = ('updated_at',)
     search_fields = ('user__username', 'user__email')
     list_per_page = 25
+
 
 class SupportTicketAdmin(admin.ModelAdmin):
     list_display = ('user', 'subject', 'priority', 'status', 'created_at')
