@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Sum
-from django.http import JsonResponse  # Add this import if not already present
+from django.contrib.auth import get_user_model  # ADD THIS LINE
+from django.http import HttpResponseRedirect, JsonResponse  # Add JsonResponse if not present
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
