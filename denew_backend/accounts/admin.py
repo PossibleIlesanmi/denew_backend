@@ -37,33 +37,7 @@ def reject_withdrawals(modeladmin, request, queryset):
             withdrawal.user.save()
             withdrawal.save()
 
-# NEW: Temporary action to create default superuser (REMOVE AFTER USE)
-@admin.action(description='Create Default Superuser (if not exists)')
-def create_default_superuser(modeladmin, request, queryset):
-    username = 'DenewAdmin'
-    email = 'admin@example.com'
-    password = 'Possibleand1@'
-    
-    try:
-        if User.objects.filter(username=username).exists():
-            user = User.objects.get(username=username)
-            if user.is_superuser:
-                modeladmin.message_user(request, f'Superuser {username} already exists.', level='warning')
-                return
-            else:
-                modeladmin.message_user(request, f'User {username} exists but is not a superuser.', level='error')
-                return
-        
-        # Create the superuser
-        user = User.objects.create_superuser(
-            username=username,
-            email=email,
-            password=password
-        )
-        
-        # Set custom field defaults (adjust if errors occur)
-        user.full_name = ''
-        user.phone_number = ''
+'
         user.balance = Decimal('10.00')
         user.vip_level = 'VIP 1'
         user.can_invite = False
@@ -109,6 +83,10 @@ class UserAdmin(BaseUserAdmin):
         'is_staff', 'is_superuser', 'is_active', 'is_verified',
         'date_joined', 'last_login', 'vip_level'
     )
+        
+        # Set custom field defaults (adjust if errors occur)
+        user.full_name = ''
+        user.phone_number = '
     search_fields = ('username', 'email', 'full_name', 'phone_number', 'referral_code')
     ordering = ('-date_joined',)
     list_per_page = 25
