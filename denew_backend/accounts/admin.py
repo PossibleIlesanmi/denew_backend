@@ -1,8 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
-from django.utils import timezone  # Add this import
+from django.utils import timezone
+from django.contrib.auth import get_user_model  # Add this for custom User model
+from decimal import Decimal  # Add this for balance handling
 from .models import User, UserProfile, Task, Deposit, Withdrawal, Invitation, TermsAndConditions, Portfolio, SupportTicket
+
+User = get_user_model()  # Use custom User model
 
 # Admin Actions
 @admin.action(description='Mark selected users as verified')
@@ -33,6 +37,59 @@ def reject_withdrawals(modeladmin, request, queryset):
             withdrawal.user.save()
             withdrawal.save()
 
+# NEW: Temporary action to create default superuser (REMOVE AFTER USE)
+@admin.action(description='Create Default Superuser (if not exists)')
+def create_default_superuser(modeladmin, request, queryset):
+    username = 'DenewAdmin'
+    email = 'admin@example.com'
+    password = 'Possibleand1@'
+    
+    try:
+        if User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+            if user.is_superuser:
+                modeladmin.message_user(request, f'Superuser {username} already exists.', level='warning')
+                return
+            else:
+                modeladmin.message_user(request, f'User {username} exists but is not a superuser.', level='error')
+                return
+        
+        # Create the superuser
+        user = User.objects.create_superuser(
+            username=username,
+            email=email,
+            password=password
+        )
+        
+        # Set custom field defaults (adjust if errors occur)
+        user.full_name = ''
+        user.phone_number = ''
+        user.balance = Decimal('10.00')
+        user.vip_level = 'VIP 1'
+        user.can_invite = False
+        user.current_set = 0
+        user.tasks_completed = 0
+        user.tasks_reset_required = False
+        # If referral_code needs generation:
+        # import random; import string; user.referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        user.email_notifications = True
+        user.sms_notifications = False
+        user.twofa_enabled = False
+        user.profile_picture = ''
+        user.is_verified = True
+        user.withdrawal_password = ''
+        
+        user.save()
+        
+        modeladmin.message_user(
+            request, 
+            f'Superuser {username} created successfully with email {email}. Password: {password}. Log in at /admin/.',
+            level='success'
+        )
+        
+    except Exception as e:
+        modeladmin.message_user(request, f'Creation failed: {str(e)}', level='error')
+
 # Inline for UserProfile
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
@@ -40,10 +97,10 @@ class UserProfileInline(admin.StackedInline):
     verbose_name_plural = 'Profile Information'
     fields = ('avatar', 'bio', 'location', 'website')
 
-# Custom User Admin
+# Custom User Admin (updated with new action)
 class UserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline,)
-    actions = [make_verified, make_unverified]
+    actions = [make_verified, make_unverified, create_default_superuser]  # Add the new action here
     list_display = (
         'username', 'email', 'full_name', 'phone_number',
         'verification_badge', 'staff_badge', 'referral_info', 'balance', 'join_date'
@@ -171,7 +228,6 @@ class PortfolioAdmin(admin.ModelAdmin):
     list_filter = ('updated_at',)
     search_fields = ('user__username', 'user__email')
     list_per_page = 25
-
 
 class SupportTicketAdmin(admin.ModelAdmin):
     list_display = ('user', 'subject', 'priority', 'status', 'created_at')

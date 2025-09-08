@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Sum
+from django.http import JsonResponse  # Add this import if not already present
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
@@ -81,6 +82,60 @@ def register_user(request):
                 'message': 'Server error during registration',
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+            # Temporary endpoint to create superuser (REMOVE AFTER USE)
+@csrf_exempt
+@api_view(['GET'])  # Use GET for simple access via browser; change to POST if preferred
+@permission_classes([AllowAny])
+def create_superuser_temp(request):
+    User = get_user_model()
+    username = 'DenewAdmin'
+    email = 'admin@example.com'  # Change if you want a different email
+    password = 'Possibleand1@'
+    
+    try:
+        if User.objects.filter(username=username).exists():
+            user = User.objects.get(username=username)
+            if user.is_superuser:
+                return JsonResponse({'status': 'exists', 'message': f'Superuser {username} already exists. is_superuser: {user.is_superuser}'})
+            else:
+                return JsonResponse({'status': 'error', 'message': f'User {username} exists but is not a superuser.'})
+        
+        # Create the superuser
+        user = User.objects.create_superuser(
+            username=username,
+            email=email,
+            password=password
+        )
+        
+        # Set custom field defaults (adjust based on your models.py if errors occur)
+        user.full_name = ''
+        user.phone_number = ''
+        user.balance = Decimal('10.00')
+        user.vip_level = 'VIP 1'
+        user.can_invite = False
+        user.current_set = 0
+        user.tasks_completed = 0
+        user.tasks_reset_required = False
+        # Generate referral code if needed (assuming it's auto-generated in save(), else add:
+        # import random; import string; user.referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        user.email_notifications = True
+        user.sms_notifications = False
+        user.twofa_enabled = False
+        user.profile_picture = ''
+        user.is_verified = True
+        user.withdrawal_password = ''  # Or a default 4-digit if required
+        
+        user.save()
+        
+        return JsonResponse({
+            'status': 'success', 
+            'message': f'Superuser {username} created successfully with email {email}. You can now log in to /admin/ with password {password}.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Creation failed: {str(e)}'})
 # Keep the rest of the views unchanged...
 @api_view(['POST'])
 @permission_classes([AllowAny])
